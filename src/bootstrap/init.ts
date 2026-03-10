@@ -1,4 +1,6 @@
 import { logger } from "../logging/logger";
+import { isSupportedEnvironment } from "./guards";
+import { startApplication } from "../app/start";
 
 export function bootstrap(): void {
   logger.info("Bootstrapping WME Place Harmonizer ROW Edition");
@@ -8,9 +10,5 @@ export function bootstrap(): void {
     return;
   }
 
-  logger.info("Environment looks valid. Initialization skeleton is ready.");
-}
-
-function isSupportedEnvironment(): boolean {
-  return typeof window !== "undefined" && typeof document !== "undefined";
+  startApplication();
 }

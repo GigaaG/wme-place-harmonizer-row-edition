@@ -10,5 +10,5 @@ export function bootstrap(): void {
     return;
   }
 
-  startApplication();
+  void startApplication();
 }

@@ -122,33 +122,25 @@ Een whitelist-entry moet stabiel en eenduidig identificeerbaar zijn.
 
 ### 7.1 Aanbevolen kernvelden
 
-placeId
-
-ruleId
-
-field
+- `placeId`
+- `ruleId`
+- `field`
 
 ### 7.2 Optionele aanvullende velden
 
-chainId
-
-country
-
-reason
-
-createdAt
-
-updatedAt
-
-expiresAt
-
-notes
+- `chainId`
+- `country`
+- `reason`
+- `createdAt`
+- `updatedAt`
+- `expiresAt`
+- `notes`
 
 ### 7.3 Unieke sleutel
 
 De runtime behandelt de combinatie van:
 
-placeId + ruleId + field
+`placeId + ruleId + field`
 
 als primaire unieke sleutel voor v1.
 
@@ -159,23 +151,23 @@ als primaire unieke sleutel voor v1.
 De whitelist wordt als versieerbaar object opgeslagen.
 
 ### 8.1 Aanbevolen top-level structuur
+
+```json
 {
   "version": 1,
   "items": []
 }
+```
+
 ### 8.2 Waarom een top-level object?
 
 Zodat later uitbreiding mogelijk blijft, zoals:
 
-metadata
-
-migratiestatus
-
-exportformaat
-
-checksums
-
-profile-informatie
+- metadata
+- migratiestatus
+- exportformaat
+- checksums
+- profile-informatie
 
 ---
 
@@ -183,19 +175,16 @@ profile-informatie
 
 Een whitelist-entry bevat idealiter:
 
-placeId
-
-ruleId
-
-field
-
-scope
-
-createdAt
-
-reason
+- `placeId`
+- `ruleId`
+- `field`
+- `scope`
+- `createdAt`
+- `reason`
 
 ### 9.1 Voorbeeld
+
+```json
 {
   "placeId": "123456789",
   "ruleId": "phoneValidation",
@@ -204,6 +193,8 @@ reason
   "createdAt": "2026-03-10T10:00:00Z",
   "reason": "Known local exception for this editor"
 }
+```
+
 ### 9.2 Betekenis van scope
 
 Voor v1 is scope vooral informatief en mag deze standaard "place" zijn.
@@ -218,23 +209,18 @@ Wanneer een issue of voorstel wordt gegenereerd, controleert de runtime of hierv
 
 Indien een match wordt gevonden, dan wordt het issue of voorstel:
 
-onderdrukt in de normale weergave
-
-optioneel gemarkeerd als whitelisted in UI of debug
-
-niet als actieve waarschuwing getoond
+- onderdrukt in de normale weergave
+- optioneel gemarkeerd als whitelisted in UI of debug
+- niet als actieve waarschuwing getoond
 
 ### 10.1 Toepassingsmoment
 
 Whitelist-checking vindt plaats nadat:
 
-config is geladen
-
-chains zijn gematcht
-
-exceptions zijn toegepast
-
-issues en voorstellen zijn opgebouwd
+- config is geladen
+- chains zijn gematcht
+- exceptions zijn toegepast
+- issues en voorstellen zijn opgebouwd
 
 Whitelist is dus de laatste suppressielaag vóór presentatie aan de gebruiker.
 
@@ -248,13 +234,10 @@ De whitelist moet exporteerbaar zijn als JSON-bestand.
 
 Export is bedoeld voor:
 
-back-up
-
-migratie naar een andere browser of machine
-
-handmatige inspectie
-
-lokaal archiveren
+- back-up
+- migratie naar een andere browser of machine
+- handmatige inspectie
+- lokaal archiveren
 
 ### 11.2 Formaat
 
@@ -262,6 +245,7 @@ Het exportformaat is gelijk aan de interne datastructuur, zodat import en export
 
 Voorbeeld:
 
+```json
 {
   "version": 1,
   "items": [
@@ -275,6 +259,8 @@ Voorbeeld:
     }
   ]
 }
+```
+
 ---
 
 ## 12. Import
@@ -285,27 +271,23 @@ Whitelist-data moet importeerbaar zijn vanuit een eerder geëxporteerd JSON-best
 
 Bij import moet de runtime minimaal controleren:
 
-geldig JSON-formaat
-
-aanwezig top-level version
-
-aanwezig items
-
-per item geldige kernvelden
+- geldig JSON-formaat
+- aanwezig top-level `version`
+- aanwezig `items`
+- per item geldige kernvelden
 
 ### 12.2 Ongeldige import
 
 Bij ongeldige import moet de runtime:
 
-duidelijke foutmelding tonen
-
-bestaande whitelist niet overschrijven
-
-niet crashen
+- duidelijke foutmelding tonen
+- bestaande whitelist niet overschrijven
+- niet crashen
 
 ---
 
 ## 13. Merge bij import
+
 ### 13.1 Doel
 
 Import moet whitelist-data kunnen samenvoegen met bestaande lokale data zonder onnodige duplicatie.
@@ -314,16 +296,15 @@ Import moet whitelist-data kunnen samenvoegen met bestaande lokale data zonder o
 
 Voor v1 wordt gemerged op:
 
-placeId + ruleId + field
+`placeId + ruleId + field`
+
 ### 13.3 Gedrag
 
 Bij import:
 
-nieuwe entries worden toegevoegd
-
-bestaande entries met dezelfde sleutel worden bijgewerkt of behouden
-
-duplicaten worden niet dubbel opgeslagen
+- nieuwe entries worden toegevoegd
+- bestaande entries met dezelfde sleutel worden bijgewerkt of behouden
+- duplicaten worden niet dubbel opgeslagen
 
 ### 13.4 Richtlijn
 
@@ -335,15 +316,11 @@ De runtime mag bij identieke sleutel de meest recente of meest complete entry be
 
 De whitelist-UI moet gebruikers in staat stellen om:
 
-individuele entries te verwijderen
-
-alle entries te bekijken
-
-whitelist per place of rule te inspecteren
-
-volledige whitelist te exporteren
-
-whitelist te importeren
+- individuele entries te verwijderen
+- alle entries te bekijken
+- whitelist per place of rule te inspecteren
+- volledige whitelist te exporteren
+- whitelist te importeren
 
 Bulkbeheer mag later uitgebreider worden, maar is geen harde v1-eis.
 
@@ -357,9 +334,12 @@ Whitelist-data moet versieerbaar zijn zodat toekomstige migraties mogelijk blijv
 
 Gebruik:
 
+```json
 {
   "version": 1
 }
+```
+
 ### 15.2 Toekomstig gebruik
 
 Bij latere versies kan de runtime migraties uitvoeren van oudere whitelist-formaten naar nieuwere.
@@ -374,7 +354,7 @@ Voor v1 is expiratie optioneel voorbereid, maar nog geen harde eis.
 
 ### 16.1 Mogelijk toekomstig veld
 
-expiresAt
+`expiresAt`
 
 ### 16.2 Mogelijk toekomstig gedrag
 
@@ -390,27 +370,23 @@ Whitelisted issues moeten voor maintainers of in debug zichtbaar kunnen blijven 
 
 De whitelist-UI moet minimaal tonen:
 
-placeId
-
-ruleId
-
-field
-
-createdAt
-
-reason
+- `placeId`
+- `ruleId`
+- `field`
+- `createdAt`
+- `reason`
 
 Optioneel kan ook getoond worden:
 
-chainId
-
-country
-
-notes
+- `chainId`
+- `country`
+- `notes`
 
 ---
 
 ## 18. Voorbeeld volledig whitelistbestand
+
+```json
 {
   "version": 1,
   "items": [
@@ -432,25 +408,21 @@ notes
     }
   ]
 }
+```
+
 ---
 
 ## 19. Wat v1 nog niet volledig vereist
 
 De volgende onderdelen mogen voorbereid zijn, maar zijn nog geen harde v1-verplichting:
 
-expiratie afdwingen
-
-meerdere whitelist-profielen
-
-synchronisatie tussen apparaten
-
-cloud-opslag
-
-geavanceerde metadata zoals tags
-
-complexe rule-group suppressie
-
-automatische deduplicatie over place-fingerprints heen
+- expiratie afdwingen
+- meerdere whitelist-profielen
+- synchronisatie tussen apparaten
+- cloud-opslag
+- geavanceerde metadata zoals tags
+- complexe rule-group suppressie
+- automatische deduplicatie over place-fingerprints heen
 
 ---
 
@@ -458,17 +430,12 @@ automatische deduplicatie over place-fingerprints heen
 
 Bij het gebruik van whitelist gelden de volgende regels:
 
-whitelist alleen wat lokaal echt nodig is
-
-gebruik exceptions voor gedeelde uitzonderingen
-
-maak whitelist-entries zo specifiek mogelijk
-
-gebruik export als back-up
-
-verwijder verouderde entries regelmatig
-
-vermijd brede suppressie als één veldspecifieke suppressie voldoende is
+- whitelist alleen wat lokaal echt nodig is
+- gebruik exceptions voor gedeelde uitzonderingen
+- maak whitelist-entries zo specifiek mogelijk
+- gebruik export als back-up
+- verwijder verouderde entries regelmatig
+- vermijd brede suppressie als één veldspecifieke suppressie voldoende is
 
 ---
 
@@ -478,16 +445,12 @@ Het whitelistmodel van WME Place Harmonizer ROW Edition is ontworpen als een lok
 
 De kern van een whitelist-entry is:
 
-placeId + ruleId + field
+`placeId + ruleId + field`
 
 Dit model zorgt ervoor dat:
 
-lokale suppressie mogelijk is
-
-community-data schoon blijft
-
-exceptions en whitelist een duidelijke eigen rol houden
-
-import/export eenvoudig blijft
-
-toekomstige uitbreiding mogelijk blijft
+- lokale suppressie mogelijk is
+- community-data schoon blijft
+- exceptions en whitelist een duidelijke eigen rol houden
+- import/export eenvoudig blijft
+- toekomstige uitbreiding mogelijk blijft

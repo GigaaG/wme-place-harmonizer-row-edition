@@ -6,6 +6,8 @@ import { mountSidebarPlaceholder } from "../integration/sdk/sidebar";
 import { loadManifest } from "../config/manifest-loader";
 import { resolveRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimeChains } from "../config/runtime-chains";
+import { matchPlaceToChain } from "../matching/chain-matcher";
+import type { PlaceLike } from "../types/place";
 
 export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
@@ -36,4 +38,18 @@ export async function startApplication(): Promise<void> {
     `Runtime chains loaded: ${runtimeChains.id} with ${runtimeChains.items.length} items`
   );
 
+    const testPlace: PlaceLike = {
+    name: "Mc Donalds",
+    categories: ["FAST_FOOD"]
+  };
+
+  const matchResult = matchPlaceToChain(testPlace, runtimeChains);
+
+  if (matchResult.matched && matchResult.chain) {
+    logger.info(
+      `Chain match found: ${matchResult.chain.id} via ${matchResult.method} (${matchResult.matchedValue ?? "n/a"})`
+    );
+  } else {
+    logger.info("No chain match found for test place");
+  }
 }

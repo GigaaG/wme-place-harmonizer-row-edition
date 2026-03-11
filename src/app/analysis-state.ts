@@ -2,10 +2,12 @@ import type { PlaceIssue } from "../types/issue";
 import type { PlaceProposal } from "../types/proposal";
 
 export interface LatestAnalysisState {
+  venueId: string;
   placeName: string;
   chainId: string | null;
   issues: PlaceIssue[];
   proposals: PlaceProposal[];
+  currentServices: string[];
   isVenueSelection: boolean;
 }
 

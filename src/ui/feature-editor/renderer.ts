@@ -52,7 +52,6 @@ function renderIssue(
   issue: PlaceIssue,
   proposals: PlaceProposal[]
 ): string {
-
   const proposal = findProposalForIssue(issue, proposals);
 
   let html = "";
@@ -74,17 +73,14 @@ function renderIssue(
   `;
 
   if (issue.field) {
-
     html += `
       <div style="font-size:12px;color:#666;margin-bottom:4px;">
         Field: ${escapeHtml(issue.field)}
       </div>
     `;
-
   }
 
   if (proposal) {
-
     html += `
       <div style="font-size:12px;margin-top:4px;">
         <b>Current:</b> ${escapeHtml(JSON.stringify(proposal.currentValue))}
@@ -97,6 +93,30 @@ function renderIssue(
       </div>
     `;
 
+    if (proposal.isApplySupported) {
+      html += `
+        <label style="display:block;margin-top:6px;font-size:12px;">
+          <input
+            type="checkbox"
+            class="wmeph-row-apply-checkbox"
+            data-field="${escapeHtml(proposal.field)}"
+            data-rule-id="${escapeHtml(proposal.issueRuleId ?? "")}"
+          />
+          Apply this fix
+        </label>
+      `;
+    } else {
+      const manualText =
+        proposal.actionType === "manual-only"
+          ? "Manual action required"
+          : "This suggestion is not applyable yet";
+
+      html += `
+        <div style="font-size:12px;color:#888;margin-top:6px;">
+          ${escapeHtml(manualText)}
+        </div>
+      `;
+    }
   }
 
   html += `</div>`;
@@ -177,10 +197,24 @@ export function renderFeatureEditorAnalysis(
       html += renderIssue(issue, proposals);
     }
   }
-  
-  container.innerHTML = html;
-  html += `
+
+  const hasApplyableProposals = proposals.some((proposal) => proposal.isApplySupported);
+
+  if (hasApplyableProposals) {
+    html += `
+      <div style="margin-top:12px;">
+        <button id="wmeph-row-apply-selected" type="button">
+          Apply selected fixes
+        </button>
+      </div>
+    `;
+  }
+
+    html += `
   </div>
   </div>
   `;
+  
+  container.innerHTML = html;
+
 }

@@ -26,6 +26,41 @@ import {
   retryEnsureFeatureEditorContainer
 } from "../ui/feature-editor/container";
 import { generateProposals } from "../proposals/generate-proposals";
+import { getSelectedProposals } from "../ui/feature-editor/actions";
+import { applyVenueProposals } from "../integration/sdk/venue-updater";
+
+function wireApplyButton(): void {
+  const button = document.getElementById("wmeph-row-apply-selected");
+
+  if (!button) {
+    return;
+  }
+
+  button.onclick = () => {
+    const latest = getLatestAnalysisState();
+
+    if (!latest?.isVenueSelection) {
+      logger.warn("Apply clicked, but no venue analysis state is available");
+      return;
+    }
+
+    const selected = getSelectedProposals(latest.proposals);
+
+    const result = applyVenueProposals(
+      latest.venueId,
+      latest.currentServices,
+      selected
+    );
+
+    logger.info(
+      `Apply result: applied=${result.applied}, skipped=${result.skipped}, errors=${result.errors.length}`
+    );
+
+    for (const error of result.errors) {
+      logger.error(`Apply error: ${error}`);
+    }
+  };
+}
 
 export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
@@ -82,6 +117,7 @@ export async function startApplication(): Promise<void> {
       latest.issues,
       latest.proposals
     );
+    wireApplyButton();
   });
 
   onVenueSelected(
@@ -122,10 +158,12 @@ export async function startApplication(): Promise<void> {
       }
 
       setLatestAnalysisState({
+        venueId: venue.id,
         placeName: place.name,
         chainId: matchResult.chain?.id ?? null,
         issues,
         proposals,
+        currentServices: place.services ?? [],
         isVenueSelection: true
       });
 
@@ -142,6 +180,7 @@ export async function startApplication(): Promise<void> {
           latest.issues,
           latest.proposals
         );
+        wireApplyButton();
       }
     },
     () => {

@@ -38,22 +38,6 @@ export function evaluatePlace(
   }
 
   //
-  // BRAND
-  //
-
-  const expectedBrand = chain?.standard?.brand;
-  if (expectedBrand && (place.brand ?? "").trim() !== expectedBrand.trim()) {
-    issues.push({
-      field: "brand",
-      severity: "warning",
-      message: `Brand should be "${expectedBrand}"`,
-      currentValue: place.brand,
-      expectedValue: expectedBrand,
-      ruleId: "brandHarmonization"
-    });
-  }
-
-  //
   // GEOMETRY
   //
 
@@ -211,7 +195,9 @@ export function evaluatePlace(
             field: "services",
             severity: "error",
             message: `Required service missing: ${required}`,
-            ruleId: "services.required"
+            currentValue: services,
+            expectedValue: required,
+            ruleId: `services.required.${required}`
           });
         }
       }
@@ -224,7 +210,9 @@ export function evaluatePlace(
             field: "services",
             severity: "warning",
             message: `Recommended service missing: ${recommended}`,
-            ruleId: "services.recommended"
+            currentValue: services,
+            expectedValue: recommended,
+            ruleId: `services.recommended.${recommended}`
           });
         }
       }
@@ -237,7 +225,9 @@ export function evaluatePlace(
             field: "services",
             severity: "error",
             message: `Forbidden service present: ${forbidden}`,
-            ruleId: "services.forbidden"
+            currentValue: services,
+            expectedValue: forbidden,
+            ruleId: `services.forbidden.${forbidden}`
           });
         }
       }

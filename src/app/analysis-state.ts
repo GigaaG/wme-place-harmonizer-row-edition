@@ -1,6 +1,11 @@
 import type { PlaceIssue } from "../types/issue";
 import type { PlaceProposal } from "../types/proposal";
 
+export interface AnalysisStatusMessage {
+  kind: "success" | "warning" | "error";
+  text: string;
+}
+
 export interface LatestAnalysisState {
   venueId: string;
   placeName: string;
@@ -9,6 +14,7 @@ export interface LatestAnalysisState {
   proposals: PlaceProposal[];
   currentServices: string[];
   isVenueSelection: boolean;
+  statusMessage?: AnalysisStatusMessage;
 }
 
 let latestAnalysisState: LatestAnalysisState | null = null;

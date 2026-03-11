@@ -128,7 +128,8 @@ export function renderFeatureEditorAnalysis(
   placeName: string,
   chainId: string | null,
   issues: PlaceIssue[],
-  proposals: PlaceProposal[]
+  proposals: PlaceProposal[],
+  statusMessage?: { kind: "success" | "warning" | "error"; text: string }
 ): void {
   const container = ensureFeatureEditorContainer();
 
@@ -145,10 +146,7 @@ export function renderFeatureEditorAnalysis(
     max-height:300px;
   ">
 
-  <div style="
-    font-weight:600;
-    margin-bottom:8px;
-  ">
+  <div style=" font-weight:600; margin-bottom:8px;">
     Place Harmonizer
   </div>
 
@@ -158,6 +156,31 @@ export function renderFeatureEditorAnalysis(
     padding-right:4px;
   ">
   `;
+
+  if (statusMessage) {
+    let color = "#2e7d32";
+
+    if (statusMessage.kind === "warning") {
+      color = "#b26a00";
+    }
+
+    if (statusMessage.kind === "error") {
+      color = "#b00020";
+    }
+
+    html += `
+      <div style="
+        border: 1px solid ${color};
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 8px;
+        color: ${color};
+        background: #fff;
+      ">
+        ${escapeHtml(statusMessage.text)}
+      </div>
+    `;
+  }
 
   html += `
     <div style="margin-bottom:8px;">

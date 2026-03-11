@@ -13,7 +13,7 @@ import { resolveEffectivePolicy } from "../config/effective-policy";
 import { onVenueSelected } from "../integration/sdk/venue-selection";
 import { mapVenueToPlaceLike } from "../integration/sdk/venue-mapper";
 import { evaluatePlace } from "../rules/evaluate-place";
-import { waitForWmeSdkReady } from "../integration/sdk/wme";
+import { waitForWmeSdkReady, getWmeSdk } from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
 import { renderFeatureEditorAnalysis } from "../ui/feature-editor/renderer";
 import {
@@ -29,14 +29,14 @@ import { generateProposals } from "../proposals/generate-proposals";
 import { getSelectedProposals } from "../ui/feature-editor/actions";
 import { applyVenueProposals } from "../integration/sdk/venue-updater";
 
-function wireApplyButton(): void {
+function wireApplyButton(runtimeConfig: any, runtimeChains: any): void {
   const button = document.getElementById("wmeph-row-apply-selected");
 
   if (!button) {
     return;
   }
 
-  button.onclick = () => {
+  button.onclick = async () => {
     const latest = getLatestAnalysisState();
 
     if (!latest?.isVenueSelection) {
@@ -59,7 +59,127 @@ function wireApplyButton(): void {
     for (const error of result.errors) {
       logger.error(`Apply error: ${error}`);
     }
+
+    const currentState = getLatestAnalysisState();
+    if (currentState) {
+      let statusMessage;
+
+      if (result.errors.length > 0) {
+        statusMessage = {
+          kind: "error" as const,
+          text: `Failed to apply some fixes (${result.errors.length} error(s))`
+        };
+      } else if (result.applied > 0) {
+        statusMessage = {
+          kind: "success" as const,
+          text: `Applied ${result.applied} fix(es), skipped ${result.skipped}`
+        };
+      } else {
+        statusMessage = {
+          kind: "warning" as const,
+          text: "No supported fixes were selected"
+        };
+      }
+
+      setLatestAnalysisState({
+        ...currentState,
+        statusMessage
+      });
+    }
+
+    const sdk = getWmeSdk();
+
+    if (!sdk) {
+      logger.warn("Cannot re-analyze after apply: SDK unavailable");
+      return;
+    }
+
+    const refreshedVenue = sdk.DataModel.Venues.getById({ venueId: latest.venueId });
+
+    if (!refreshedVenue) {
+      logger.warn(`Cannot re-analyze after apply: venue ${latest.venueId} not found`);
+      return;
+    }
+
+    await analyzeVenue({
+      venue: refreshedVenue,
+      runtimeConfig,
+      runtimeChains
+    });
   };
+}
+
+async function analyzeVenue(params: {
+  venue: any;
+  runtimeConfig: any;
+  runtimeChains: any;
+}): Promise<void> {
+  const { venue, runtimeConfig, runtimeChains } = params;
+
+  logger.info(`Selected venue: ${venue.name}`);
+
+  const place = mapVenueToPlaceLike(venue);
+
+  const matchResult = matchPlaceToChain(place, runtimeChains);
+
+  if (matchResult.matched && matchResult.chain) {
+    logger.info(
+      `Chain match found: ${matchResult.chain.id} via ${matchResult.method}`
+    );
+  }
+
+  const categoryStandards = resolveCategoryStandards(
+    runtimeConfig,
+    place.categories ?? []
+  );
+
+  const effectivePolicy = resolveEffectivePolicy({
+    categoryStandards,
+    chainPolicy: matchResult.chain?.policy
+  });
+
+  logger.info(
+    `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
+  );
+
+  const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
+  const proposals = generateProposals(issues);
+
+  for (const issue of issues) {
+    logger.info(
+      `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
+    );
+  }
+
+  const previous = getLatestAnalysisState();
+
+  setLatestAnalysisState({
+    venueId: venue.id,
+    placeName: place.name,
+    chainId: matchResult.chain?.id ?? null,
+    issues,
+    proposals,
+    currentServices: place.services ?? [],
+    isVenueSelection: true,
+    statusMessage: previous?.statusMessage
+  });
+
+  retryEnsureFeatureEditorContainer(() => {
+    const latest = getLatestAnalysisState();
+    return !!latest?.isVenueSelection;
+  });
+
+  const latest = getLatestAnalysisState();
+  if (latest?.isVenueSelection) {
+    renderFeatureEditorAnalysis(
+      latest.placeName,
+      latest.chainId,
+      latest.issues,
+      latest.proposals,
+      latest.statusMessage
+    );
+    wireApplyButton(params.runtimeConfig, params.runtimeChains);
+  }
 }
 
 export async function startApplication(): Promise<void> {
@@ -115,73 +235,19 @@ export async function startApplication(): Promise<void> {
       latest.placeName,
       latest.chainId,
       latest.issues,
-      latest.proposals
+      latest.proposals,
+      latest.statusMessage
     );
-    wireApplyButton();
+    wireApplyButton(runtimeConfig, runtimeChains);
   });
 
   onVenueSelected(
     async (venue) => {
-      logger.info(`Selected venue: ${venue.name}`);
-
-      const place = mapVenueToPlaceLike(venue);
-
-      const matchResult = matchPlaceToChain(place, runtimeChains);
-
-      if (matchResult.matched && matchResult.chain) {
-        logger.info(
-          `Chain match found: ${matchResult.chain.id} via ${matchResult.method}`
-        );
-      }
-
-      const categoryStandards = resolveCategoryStandards(
+      await analyzeVenue({
+        venue,
         runtimeConfig,
-        place.categories ?? []
-      );
-
-      const effectivePolicy = resolveEffectivePolicy({
-        categoryStandards,
-        chainPolicy: matchResult.chain?.policy
+        runtimeChains
       });
-
-      logger.info(
-        `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
-      );
-
-      const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
-      const proposals = generateProposals(issues);
-
-      for (const issue of issues) {
-        logger.info(
-          `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
-        );
-      }
-
-      setLatestAnalysisState({
-        venueId: venue.id,
-        placeName: place.name,
-        chainId: matchResult.chain?.id ?? null,
-        issues,
-        proposals,
-        currentServices: place.services ?? [],
-        isVenueSelection: true
-      });
-
-      retryEnsureFeatureEditorContainer(() => {
-        const latest = getLatestAnalysisState();
-        return !!latest?.isVenueSelection;
-      });
-
-      const latest = getLatestAnalysisState();
-      if (latest?.isVenueSelection) {
-        renderFeatureEditorAnalysis(
-          latest.placeName,
-          latest.chainId,
-          latest.issues,
-          latest.proposals
-        );
-        wireApplyButton();
-      }
     },
     () => {
       logger.info("Selection is not a venue, hiding Place Harmonizer block");

@@ -28,6 +28,9 @@ import {
 import { generateProposals } from "../proposals/generate-proposals";
 import { getSelectedProposals } from "../ui/feature-editor/actions";
 import { applyVenueProposals } from "../integration/sdk/venue-updater";
+import { setSidebarDebugState, getSidebarDebugState } from "./app-state";
+import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
+import { wireSidebarPanelActions } from "../ui/sidebar/actions";
 
 function wireApplyButton(runtimeConfig: any, runtimeChains: any): void {
   const button = document.getElementById("wmeph-row-apply-selected");
@@ -146,9 +149,23 @@ async function analyzeVenue(params: {
   const proposals = generateProposals(issues);
 
   for (const issue of issues) {
-    logger.info(
-      `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
-    );
+      logger.info(
+        `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
+      );
+    }
+
+    const sidebarState = getSidebarDebugState();
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      lastStatus: `Analyzed venue: ${place.name} (${issues.length} issue(s))`
+    });
+
+    const updatedSidebarState = getSidebarDebugState();
+    if (updatedSidebarState) {
+      await renderSidebarDebugPanel(updatedSidebarState);
+      wireSidebarPanelActions();
+    }
   }
 
   const previous = getLatestAnalysisState();
@@ -215,6 +232,24 @@ export async function startApplication(): Promise<void> {
     `Runtime chains loaded: ${runtimeChains.id} with ${runtimeChains.items.length} items`
   );
 
+  setSidebarDebugState({
+    scriptName: "WME Place Harmonizer ROW Edition",
+    dataChannel: settings.dataChannel,
+    manifestVersion: manifest.version,
+    manifestRevision: manifest.dataRevision,
+    runtimeConfigId: runtimeConfig.id,
+    runtimeConfigVersion: runtimeConfig.version,
+    runtimeChainsId: runtimeChains.id,
+    runtimeChainsCount: runtimeChains.items.length,
+    lastStatus: "Ready"
+  });
+
+  const sidebarState = getSidebarDebugState();
+  if (sidebarState) {
+    await renderSidebarDebugPanel(sidebarState);
+    wireSidebarPanelActions();
+  }
+
   logger.info("Registering selected venue analysis flow");
 
   onFeatureEditorOpened(() => {
@@ -249,9 +284,22 @@ export async function startApplication(): Promise<void> {
         runtimeChains
       });
     },
-    () => {
+    async () => {
       logger.info("Selection is not a venue, hiding Place Harmonizer block");
       clearLatestAnalysisState();
+      const sidebarState = getSidebarDebugState();
+      if (sidebarState) {
+        setSidebarDebugState({
+          ...sidebarState,
+          lastStatus: "Selection is not a venue"
+        });
+
+        const updatedSidebarState = getSidebarDebugState();
+        if (updatedSidebarState) {
+          await renderSidebarDebugPanel(updatedSidebarState);
+          wireSidebarPanelActions();
+        }
+      }
       removeFeatureEditorContainer();
     }
   );

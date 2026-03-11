@@ -8,6 +8,8 @@ import { resolveRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimeChains } from "../config/runtime-chains";
 import { matchPlaceToChain } from "../matching/chain-matcher";
 import type { PlaceLike } from "../types/place";
+import { resolveCategoryStandards } from "../config/category-standards";
+import { resolveEffectivePolicy } from "../config/effective-policy";
 
 export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
@@ -52,4 +54,18 @@ export async function startApplication(): Promise<void> {
   } else {
     logger.info("No chain match found for test place");
   }
+
+  const categoryStandards = resolveCategoryStandards(
+    runtimeConfig,
+    testPlace.categories ?? []
+  );
+
+  const effectivePolicy = resolveEffectivePolicy({
+    categoryStandards,
+    chainPolicy: matchResult.chain?.policy
+  });
+
+  logger.info(
+    `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
+  );
 }

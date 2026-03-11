@@ -1,11 +1,15 @@
 import { logger } from "../../logging/logger";
 import { getWmeSdk } from "./wme";
 
-function processCurrentSelection(callback: (venue: any) => void): void {
+function processCurrentSelection(
+  onVenue: (venue: any) => void,
+  onNonVenue: () => void
+): void {
   const sdk = getWmeSdk();
 
   if (!sdk) {
     logger.warn("Cannot process selection: SDK unavailable");
+    onNonVenue();
     return;
   }
 
@@ -13,6 +17,7 @@ function processCurrentSelection(callback: (venue: any) => void): void {
 
   if (!selection) {
     logger.info("No current selection");
+    onNonVenue();
     return;
   }
 
@@ -22,6 +27,7 @@ function processCurrentSelection(callback: (venue: any) => void): void {
 
   if (selection.objectType !== "venue") {
     logger.info(`Current selection is not a venue: ${selection.objectType}`);
+    onNonVenue();
     return;
   }
 
@@ -29,6 +35,7 @@ function processCurrentSelection(callback: (venue: any) => void): void {
 
   if (!venueId) {
     logger.warn("Venue selection exists, but no venue id was found");
+    onNonVenue();
     return;
   }
 
@@ -36,15 +43,19 @@ function processCurrentSelection(callback: (venue: any) => void): void {
 
   if (!venue) {
     logger.warn(`Selected venue ${venueId} not found in SDK data model`);
+    onNonVenue();
     return;
   }
 
   logger.info(`Venue selected via SDK: ${venue.name} (${venueId})`);
 
-  callback(venue);
+  onVenue(venue);
 }
 
-export function onVenueSelected(callback: (venue: any) => void): void {
+export function onVenueSelected(
+  onVenue: (venue: any) => void,
+  onNonVenue: () => void
+): void {
   const sdk = getWmeSdk();
 
   if (!sdk) {
@@ -56,12 +67,11 @@ export function onVenueSelected(callback: (venue: any) => void): void {
     eventName: "wme-selection-changed",
     eventHandler: () => {
       logger.info("Received wme-selection-changed event");
-      processCurrentSelection(callback);
+      processCurrentSelection(onVenue, onNonVenue);
     }
   });
 
   logger.info("Venue selection listener registered via SDK");
 
-  // Ook meteen de huidige selectie verwerken.
-  processCurrentSelection(callback);
+  processCurrentSelection(onVenue, onNonVenue);
 }

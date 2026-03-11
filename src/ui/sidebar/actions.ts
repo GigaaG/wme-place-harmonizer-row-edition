@@ -18,3 +18,24 @@ export function wireSidebarPanelActions(): void {
     await renderSidebarDebugPanel(state);
   };
 }
+
+export function wireSidebarReloadButton(
+  reloadHandler: () => Promise<void>
+) {
+
+  const button = document.getElementById("wmeph-row-reload-data");
+
+  if (!button) {
+    return;
+  }
+
+  button.onclick = async () => {
+    button.setAttribute("disabled", "true");
+
+    try {
+      await reloadHandler();
+    } finally {
+      button.removeAttribute("disabled");
+    }
+  };
+}

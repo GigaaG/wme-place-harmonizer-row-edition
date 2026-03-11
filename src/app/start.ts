@@ -30,7 +30,88 @@ import { getSelectedProposals } from "../ui/feature-editor/actions";
 import { applyVenueProposals } from "../integration/sdk/venue-updater";
 import { setSidebarDebugState, getSidebarDebugState } from "./app-state";
 import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
-import { wireSidebarPanelActions } from "../ui/sidebar/actions";
+import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/actions";
+
+//
+// Runtime containers
+//
+
+let runtimeManifest: any | null = null;
+let runtimeConfig: any | null = null;
+let runtimeChains: any | null = null;
+let runtimeSettings: any | null = null;
+
+//
+// Functions
+//
+
+async function reloadData(): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn("Reload requested but settings not initialized");
+    return;
+  }
+
+  logger.info("Reloading runtime data");
+
+  runtimeManifest = await loadManifest(runtimeSettings.dataChannel);
+  runtimeConfig = await resolveRuntimeConfig();
+  runtimeChains = await resolveRuntimeChains();
+
+  logger.info("Runtime data reloaded");
+
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState && runtimeManifest && runtimeConfig && runtimeChains) {
+    setSidebarDebugState({
+      ...sidebarState,
+      manifestVersion: runtimeManifest.version,
+      manifestRevision: runtimeManifest.dataRevision,
+      runtimeConfigId: runtimeConfig.id,
+      runtimeConfigVersion: runtimeConfig.version,
+      runtimeChainsId: runtimeChains.id,
+      runtimeChainsCount: runtimeChains.items.length,
+      lastStatus: "Runtime data reloaded"
+    });
+
+    const updated = getSidebarDebugState();
+
+    if (updated) {
+      await renderSidebarDebugPanel(updated);
+      wireSidebarPanelActions();
+      wireSidebarReloadButton(reloadData);
+    }
+  }
+
+  const latest = getLatestAnalysisState();
+
+  if (latest?.isVenueSelection) {
+
+    const sdk = getWmeSdk();
+
+    if (!sdk) {
+      logger.warn("Cannot re-analyze after reload: SDK unavailable");
+      return;
+    }
+
+    const venue = sdk.DataModel.Venues.getById({
+      venueId: latest.venueId
+    });
+
+    if (!venue) {
+      logger.warn(`Cannot re-analyze venue ${latest.venueId} after reload`);
+      return;
+    }
+
+    logger.info("Re-analyzing venue after runtime reload");
+
+    await analyzeVenue({
+      venue,
+      runtimeConfig,
+      runtimeChains
+    });
+  }
+
+}
 
 function wireApplyButton(runtimeConfig: any, runtimeChains: any): void {
   const button = document.getElementById("wmeph-row-apply-selected");
@@ -165,6 +246,7 @@ async function analyzeVenue(params: {
     if (updatedSidebarState) {
       await renderSidebarDebugPanel(updatedSidebarState);
       wireSidebarPanelActions();
+      wireSidebarReloadButton(reloadData);
     }
   }
 
@@ -203,6 +285,7 @@ export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
 
   const settings = settingsManager.load();
+  runtimeSettings = settings;
   logger.info(`Loaded settings for channel: ${settings.dataChannel}`);
 
   try {
@@ -218,6 +301,7 @@ export async function startApplication(): Promise<void> {
   mountSidebarPlaceholder();
 
   const manifest = await loadManifest(settings.dataChannel);
+  runtimeManifest = manifest;
   logger.info(
     `Active manifest loaded: ${manifest.channel} / ${manifest.version} / ${manifest.dataRevision}`
   );
@@ -248,7 +332,10 @@ export async function startApplication(): Promise<void> {
   if (sidebarState) {
     await renderSidebarDebugPanel(sidebarState);
     wireSidebarPanelActions();
+    wireSidebarReloadButton(reloadData);
   }
+
+  wireSidebarReloadButton(reloadData);
 
   logger.info("Registering selected venue analysis flow");
 
@@ -298,6 +385,7 @@ export async function startApplication(): Promise<void> {
         if (updatedSidebarState) {
           await renderSidebarDebugPanel(updatedSidebarState);
           wireSidebarPanelActions();
+          wireSidebarReloadButton(reloadData);
         }
       }
       removeFeatureEditorContainer();

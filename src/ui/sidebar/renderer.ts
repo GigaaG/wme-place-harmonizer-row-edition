@@ -66,8 +66,8 @@ export async function renderSidebarDebugPanel(
 
   html += `
       <div style="margin-top:10px;">
-        <button id="wmeph-row-sidebar-refresh" type="button">
-          Refresh panel
+        <button id="wmeph-row-reload-data" type="button">
+            Reload data
         </button>
       </div>
     </div>

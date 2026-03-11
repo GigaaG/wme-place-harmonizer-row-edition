@@ -10,6 +10,10 @@ import { matchPlaceToChain } from "../matching/chain-matcher";
 import type { PlaceLike } from "../types/place";
 import { resolveCategoryStandards } from "../config/category-standards";
 import { resolveEffectivePolicy } from "../config/effective-policy";
+import { onVenueSelected } from "../integration/sdk/venue-selection";
+import { mapVenueToPlaceLike } from "../integration/sdk/venue-mapper";
+import { evaluatePlace } from "../rules/evaluate-place";
+import { waitForWmeSdkReady } from "../integration/sdk/wme";
 
 export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
@@ -17,9 +21,13 @@ export async function startApplication(): Promise<void> {
   const settings = settingsManager.load();
   logger.info(`Loaded settings for channel: ${settings.dataChannel}`);
 
-  const wmeContext = getWmeContext();
-  if (!wmeContext.isReady) {
-    logger.warn("WME context is not ready");
+  try {
+    await waitForWmeSdkReady();
+    logger.info("WME context is ready");
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown WME SDK readiness error";
+    logger.warn(`WME context is not ready: ${message}`);
     return;
   }
 
@@ -40,32 +48,44 @@ export async function startApplication(): Promise<void> {
     `Runtime chains loaded: ${runtimeChains.id} with ${runtimeChains.items.length} items`
   );
 
-    const testPlace: PlaceLike = {
-    name: "Mc Donalds",
-    categories: ["FAST_FOOD"]
-  };
+  logger.info("Registering selected venue analysis flow");
 
-  const matchResult = matchPlaceToChain(testPlace, runtimeChains);
+  onVenueSelected(async (venue) => {
 
-  if (matchResult.matched && matchResult.chain) {
-    logger.info(
-      `Chain match found: ${matchResult.chain.id} via ${matchResult.method} (${matchResult.matchedValue ?? "n/a"})`
+    logger.info(`Selected venue: ${venue.name}`);
+
+    const place = mapVenueToPlaceLike(venue);
+
+    const matchResult = matchPlaceToChain(place, runtimeChains);
+
+    if (matchResult.matched && matchResult.chain) {
+
+      logger.info(
+        `Chain match found: ${matchResult.chain.id} via ${matchResult.method}`
+      );
+
+    }
+
+    const categoryStandards = resolveCategoryStandards(
+      runtimeConfig,
+      place.categories ?? []
     );
-  } else {
-    logger.info("No chain match found for test place");
-  }
 
-  const categoryStandards = resolveCategoryStandards(
-    runtimeConfig,
-    testPlace.categories ?? []
-  );
+    const effectivePolicy = resolveEffectivePolicy({
+      categoryStandards,
+      chainPolicy: matchResult.chain?.policy
+    });
 
-  const effectivePolicy = resolveEffectivePolicy({
-    categoryStandards,
-    chainPolicy: matchResult.chain?.policy
+    const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
+
+    for (const issue of issues) {
+
+      logger.info(
+        `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
+      );
+
+    }
+
   });
-
-  logger.info(
-    `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
-  );
+  
 }

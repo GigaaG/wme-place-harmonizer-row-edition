@@ -9,3 +9,12 @@ declare function GM_xmlhttpRequest(details: {
   }) => void;
   onerror?: (error: unknown) => void;
 }): void;
+
+declare const unsafeWindow: Window & {
+  SDK_INITIALIZED?: Promise<void>;
+  getWmeSdk?: (options: {
+    scriptId: string;
+    scriptName: string;
+    version?: string;
+  }) => any;
+};

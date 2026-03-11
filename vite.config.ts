@@ -17,9 +17,8 @@ function buildUserscriptBanner(): string {
 // @author       Contributors
 // @match        https://www.waze.com/*editor*
 // @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
-// @connect      cdn.jsdelivr.net
-// @connect      github.com
 // @run-at       document-end
 // ==/UserScript==
 

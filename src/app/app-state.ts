@@ -8,6 +8,12 @@ export interface SidebarDebugState {
   runtimeChainsId: string;
   runtimeChainsCount: number;
   lastStatus?: string;
+  lastScanSummary?: {
+    total: number;
+    ok: number;
+    warning: number;
+    error: number;
+  };
 }
 
 let sidebarDebugState: SidebarDebugState | null = null;

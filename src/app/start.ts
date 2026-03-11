@@ -31,6 +31,10 @@ import { applyVenueProposals } from "../integration/sdk/venue-updater";
 import { setSidebarDebugState, getSidebarDebugState } from "./app-state";
 import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
 import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/actions";
+import { getVisibleVenues } from "../integration/sdk/visible-venues";
+import { scanVisibleVenues } from "./scan-visible-venues";
+import { wireSidebarScanButton } from "../ui/sidebar/actions";
+
 
 //
 // Runtime containers
@@ -44,6 +48,53 @@ let runtimeSettings: any | null = null;
 //
 // Functions
 //
+
+async function rerenderSidebar(): Promise<void> {
+  const state = getSidebarDebugState();
+
+  if (!state) {
+    return;
+  }
+
+  await renderSidebarDebugPanel(state);
+  wireSidebarPanelActions();
+  wireSidebarReloadButton(reloadData);
+  wireSidebarScanButton(scanVisibleVenuesFromMap);
+}
+
+async function scanVisibleVenuesFromMap(): Promise<void> {
+  if (!runtimeConfig || !runtimeChains) {
+    logger.warn("Cannot scan visible venues: runtime not initialized");
+    return;
+  }
+
+  const venues = getVisibleVenues();
+
+  logger.info(`Scanning ${venues.length} visible venue(s)`);
+
+  const summary = scanVisibleVenues({
+    venues,
+    runtimeConfig,
+    runtimeChains
+  });
+
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      lastStatus: `Scanned ${summary.total} visible venue(s)`,
+      lastScanSummary: {
+        total: summary.total,
+        ok: summary.ok,
+        warning: summary.warning,
+        error: summary.error
+      }
+    });
+
+    await rerenderSidebar();
+  }
+}
 
 async function reloadData(): Promise<void> {
   if (!runtimeSettings) {
@@ -76,9 +127,7 @@ async function reloadData(): Promise<void> {
     const updated = getSidebarDebugState();
 
     if (updated) {
-      await renderSidebarDebugPanel(updated);
-      wireSidebarPanelActions();
-      wireSidebarReloadButton(reloadData);
+      await rerenderSidebar();
     }
   }
 
@@ -244,9 +293,7 @@ async function analyzeVenue(params: {
 
     const updatedSidebarState = getSidebarDebugState();
     if (updatedSidebarState) {
-      await renderSidebarDebugPanel(updatedSidebarState);
-      wireSidebarPanelActions();
-      wireSidebarReloadButton(reloadData);
+      await rerenderSidebar();
     }
   }
 
@@ -306,12 +353,12 @@ export async function startApplication(): Promise<void> {
     `Active manifest loaded: ${manifest.channel} / ${manifest.version} / ${manifest.dataRevision}`
   );
 
-  const runtimeConfig = await resolveRuntimeConfig();
+  runtimeConfig = await resolveRuntimeConfig();
   logger.info(
     `Runtime config loaded: ${runtimeConfig.id} v${runtimeConfig.version}`
   );
 
-  const runtimeChains = await resolveRuntimeChains();
+  runtimeChains = await resolveRuntimeChains();
   logger.info(
     `Runtime chains loaded: ${runtimeChains.id} with ${runtimeChains.items.length} items`
   );
@@ -330,9 +377,7 @@ export async function startApplication(): Promise<void> {
 
   const sidebarState = getSidebarDebugState();
   if (sidebarState) {
-    await renderSidebarDebugPanel(sidebarState);
-    wireSidebarPanelActions();
-    wireSidebarReloadButton(reloadData);
+    await rerenderSidebar();
   }
 
   wireSidebarReloadButton(reloadData);
@@ -383,9 +428,7 @@ export async function startApplication(): Promise<void> {
 
         const updatedSidebarState = getSidebarDebugState();
         if (updatedSidebarState) {
-          await renderSidebarDebugPanel(updatedSidebarState);
-          wireSidebarPanelActions();
-          wireSidebarReloadButton(reloadData);
+          await rerenderSidebar();
         }
       }
       removeFeatureEditorContainer();

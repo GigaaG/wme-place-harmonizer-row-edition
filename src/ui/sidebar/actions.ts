@@ -39,3 +39,23 @@ export function wireSidebarReloadButton(
     }
   };
 }
+
+export function wireSidebarScanButton(
+  scanHandler: () => Promise<void>
+): void {
+  const button = document.getElementById("wmeph-row-scan-visible");
+
+  if (!button) {
+    return;
+  }
+
+  button.onclick = async () => {
+    button.setAttribute("disabled", "true");
+
+    try {
+      await scanHandler();
+    } finally {
+      button.removeAttribute("disabled");
+    }
+  };
+}

@@ -64,12 +64,29 @@ export async function renderSidebarDebugPanel(
       </div>
   `;
 
-  html += `
-      <div style="margin-top:10px;">
-        <button id="wmeph-row-reload-data" type="button">
-            Reload data
-        </button>
+  if (state.lastScanSummary) {
+    html += `
+      <div style="margin-bottom:8px;">
+        <b>Last scan</b><br>
+        Total: ${escapeHtml(state.lastScanSummary.total)}<br>
+        OK: ${escapeHtml(state.lastScanSummary.ok)}<br>
+        Warnings: ${escapeHtml(state.lastScanSummary.warning)}<br>
+        Errors: ${escapeHtml(state.lastScanSummary.error)}
       </div>
+    `;
+  }
+
+  html += `
+    <div style="margin-top:10px;">
+      <button id="wmeph-row-reload-data" type="button">
+        Reload data
+      </button>
+    </div>
+
+    <div style="margin-top:8px;">
+      <button id="wmeph-row-scan-visible" type="button">
+        Scan visible venues
+      </button>
     </div>
   `;
 

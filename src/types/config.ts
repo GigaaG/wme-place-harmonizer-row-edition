@@ -1,3 +1,5 @@
+import type { GeometryType } from "./chains";
+
 export interface ConfigMeta {
   name?: string;
   description?: string;
@@ -11,6 +13,28 @@ export interface ConfigScope {
 export interface RuleConfig {
   enabled: boolean;
   severity?: "info" | "warning" | "error";
+}
+
+export interface GeometryStandard {
+  required?: GeometryType;
+  recommended?: GeometryType;
+  allowed?: GeometryType[];
+}
+
+export interface ServiceStandard {
+  required?: string[];
+  recommended?: string[];
+  forbidden?: string[];
+}
+
+export interface CategoryStandard {
+  geometry?: GeometryStandard;
+  lockLevel?: number;
+  requirePhone?: boolean;
+  requireUrl?: boolean;
+  requireOpeningHours?: boolean;
+  requireExternalProvider?: boolean;
+  services?: ServiceStandard;
 }
 
 export interface HarmonizerConfig {
@@ -28,4 +52,5 @@ export interface HarmonizerConfig {
   highlighting?: Record<string, unknown>;
 
   rules?: Record<string, RuleConfig>;
+  categoryStandards?: Record<string, CategoryStandard>;
 }

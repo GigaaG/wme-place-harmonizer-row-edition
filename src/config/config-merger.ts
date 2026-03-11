@@ -31,6 +31,11 @@ export function mergeConfigs(
     rules: {
       ...base.rules,
       ...override.rules
+    },
+
+    categoryStandards: {
+      ...base.categoryStandards,
+      ...override.categoryStandards
     }
   };
 }

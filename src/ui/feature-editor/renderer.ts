@@ -1,5 +1,19 @@
 import type { PlaceIssue } from "../../types/issue";
 import { ensureFeatureEditorContainer } from "./container";
+import type { PlaceProposal } from "../../types/proposal";
+
+function findProposalForIssue(
+  issue: PlaceIssue,
+  proposals: PlaceProposal[]
+): PlaceProposal | undefined {
+
+  return proposals.find(
+    (proposal) =>
+      proposal.field === issue.field &&
+      proposal.issueRuleId === issue.ruleId
+  );
+
+}
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -34,7 +48,13 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
-function renderIssue(issue: PlaceIssue): string {
+function renderIssue(
+  issue: PlaceIssue,
+  proposals: PlaceProposal[]
+): string {
+
+  const proposal = findProposalForIssue(issue, proposals);
+
   let html = "";
 
   html += `
@@ -45,44 +65,38 @@ function renderIssue(issue: PlaceIssue): string {
       margin-top: 8px;
       background: #fff;
     ">
-      <div style="font-weight:600; margin-bottom:4px;">
-        ${getSeverityIcon(issue.severity)} ${escapeHtml(getSeverityLabel(issue.severity))}
-      </div>
-      <div style="margin-bottom:4px;">
-        ${escapeHtml(issue.message)}
-      </div>
+  `;
+
+  html += `
+    <div style="font-weight:600; margin-bottom:4px;">
+      ${getSeverityIcon(issue.severity)} ${escapeHtml(issue.message)}
+    </div>
   `;
 
   if (issue.field) {
+
     html += `
-      <div style="font-size:12px; color:#666; margin-bottom:4px;">
+      <div style="font-size:12px;color:#666;margin-bottom:4px;">
         Field: ${escapeHtml(issue.field)}
       </div>
     `;
+
   }
 
-  if (issue.currentValue !== undefined) {
-    html += `
-      <div style="font-size:12px; margin-bottom:2px;">
-        <b>Current:</b> ${escapeHtml(JSON.stringify(issue.currentValue))}
-      </div>
-    `;
-  }
+  if (proposal) {
 
-  if (issue.expectedValue !== undefined) {
     html += `
-      <div style="font-size:12px; margin-bottom:2px;">
-        <b>Expected:</b> ${escapeHtml(JSON.stringify(issue.expectedValue))}
+      <div style="font-size:12px;margin-top:4px;">
+        <b>Current:</b> ${escapeHtml(JSON.stringify(proposal.currentValue))}
       </div>
     `;
-  }
 
-  if (issue.ruleId) {
     html += `
-      <div style="font-size:12px; color:#888; margin-top:4px;">
-        Rule: ${escapeHtml(issue.ruleId)}
+      <div style="font-size:12px;">
+        <b>Suggested:</b> ${escapeHtml(JSON.stringify(proposal.proposedValue))}
       </div>
     `;
+
   }
 
   html += `</div>`;
@@ -93,7 +107,8 @@ function renderIssue(issue: PlaceIssue): string {
 export function renderFeatureEditorAnalysis(
   placeName: string,
   chainId: string | null,
-  issues: PlaceIssue[]
+  issues: PlaceIssue[],
+  proposals: PlaceProposal[]
 ): void {
   const container = ensureFeatureEditorContainer();
 
@@ -104,9 +119,24 @@ export function renderFeatureEditorAnalysis(
   let html = "";
 
   html += `
-    <div style="font-weight:600; margin-bottom:8px;">
-      Place Harmonizer
-    </div>
+  <div style="
+    display:flex;
+    flex-direction:column;
+    max-height:300px;
+  ">
+
+  <div style="
+    font-weight:600;
+    margin-bottom:8px;
+  ">
+    Place Harmonizer
+  </div>
+
+  <div style="
+    overflow-y:auto;
+    max-height:260px;
+    padding-right:4px;
+  ">
   `;
 
   html += `
@@ -144,9 +174,13 @@ export function renderFeatureEditorAnalysis(
     `;
   } else {
     for (const issue of issues) {
-      html += renderIssue(issue);
+      html += renderIssue(issue, proposals);
     }
   }
-
+  
   container.innerHTML = html;
+  html += `
+  </div>
+  </div>
+  `;
 }

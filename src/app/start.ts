@@ -25,6 +25,7 @@ import {
   removeFeatureEditorContainer,
   retryEnsureFeatureEditorContainer
 } from "../ui/feature-editor/container";
+import { generateProposals } from "../proposals/generate-proposals";
 
 export async function startApplication(): Promise<void> {
   logger.info(`Starting ${APP_NAME}`);
@@ -75,7 +76,12 @@ export async function startApplication(): Promise<void> {
       return !!current?.isVenueSelection;
     });
 
-    renderFeatureEditorAnalysis(latest.placeName, latest.chainId, latest.issues);
+    renderFeatureEditorAnalysis(
+      latest.placeName,
+      latest.chainId,
+      latest.issues,
+      latest.proposals
+    );
   });
 
   onVenueSelected(
@@ -107,6 +113,7 @@ export async function startApplication(): Promise<void> {
       );
 
       const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
+      const proposals = generateProposals(issues);
 
       for (const issue of issues) {
         logger.info(
@@ -118,6 +125,7 @@ export async function startApplication(): Promise<void> {
         placeName: place.name,
         chainId: matchResult.chain?.id ?? null,
         issues,
+        proposals,
         isVenueSelection: true
       });
 
@@ -128,7 +136,12 @@ export async function startApplication(): Promise<void> {
 
       const latest = getLatestAnalysisState();
       if (latest?.isVenueSelection) {
-        renderFeatureEditorAnalysis(latest.placeName, latest.chainId, latest.issues);
+        renderFeatureEditorAnalysis(
+          latest.placeName,
+          latest.chainId,
+          latest.issues,
+          latest.proposals
+        );
       }
     },
     () => {

@@ -105,3 +105,31 @@ export async function waitForWmeSdkReady(timeoutMs = 20000): Promise<any> {
 
   return sdk;
 }
+
+export async function waitForInitialMapDataLoaded(timeoutMs = 15000): Promise<void> {
+  const sdk = getWmeSdk();
+
+  if (!sdk) {
+    throw new Error("WME SDK not available while waiting for map data");
+  }
+
+  if (sdk.State?.isInitialMapDataLoaded?.()) {
+    logger.info("Initial map data is already loaded");
+    return;
+  }
+
+  logger.info("Waiting for initial map data load");
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    window.setTimeout(() => {
+      reject(new Error("Timed out waiting for initial map data"));
+    }, timeoutMs);
+  });
+
+  await Promise.race([
+    sdk.Events.once({ eventName: "wme-map-initial-data-loaded" }),
+    timeoutPromise
+  ]);
+
+  logger.info("Initial map data loaded");
+}

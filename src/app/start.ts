@@ -1,19 +1,21 @@
 import { APP_NAME } from "../constants/app";
 import { logger } from "../logging/logger";
 import { settingsManager } from "../settings/manager";
-import { getWmeContext } from "../integration/sdk/wme";
 import { mountSidebarPlaceholder } from "../integration/sdk/sidebar";
 import { loadManifest } from "../config/manifest-loader";
 import { resolveRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimeChains } from "../config/runtime-chains";
 import { matchPlaceToChain } from "../matching/chain-matcher";
-import type { PlaceLike } from "../types/place";
 import { resolveCategoryStandards } from "../config/category-standards";
 import { resolveEffectivePolicy } from "../config/effective-policy";
 import { onVenueSelected } from "../integration/sdk/venue-selection";
 import { mapVenueToPlaceLike } from "../integration/sdk/venue-mapper";
 import { evaluatePlace } from "../rules/evaluate-place";
-import { waitForWmeSdkReady, getWmeSdk } from "../integration/sdk/wme";
+import {
+  waitForWmeSdkReady,
+  waitForInitialMapDataLoaded,
+  getWmeSdk
+} from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
 import { renderFeatureEditorAnalysis } from "../ui/feature-editor/renderer";
 import {
@@ -34,9 +36,15 @@ import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/
 import { getVisibleVenues } from "../integration/sdk/visible-venues";
 import { scanVisibleVenues } from "./scan-visible-venues";
 import { wireSidebarScanButton } from "../ui/sidebar/actions";
-import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";  
+import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";
 import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
 import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
+import { normalizeCountryCode } from "../config/country-code";
+import {
+  resolveVenueCountryCode,
+  resolveCountryCodeFromCountryEntity,
+  resolveCountryCodeFromCountryId
+} from "../integration/sdk/venue-country";
 
 //
 // Runtime containers
@@ -46,10 +54,262 @@ let runtimeManifest: any | null = null;
 let runtimeConfig: any | null = null;
 let runtimeChains: any | null = null;
 let runtimeSettings: any | null = null;
+let runtimeCountry: string | undefined;
 
 //
 // Functions
 //
+
+function resolvePreferredCountry(placeCountry?: string): string | undefined {
+  const normalizedPlaceCountry = normalizeCountryCode(placeCountry);
+
+  if (normalizedPlaceCountry) {
+    return normalizedPlaceCountry;
+  }
+
+  return normalizeCountryCode(runtimeSettings?.fallbackCountry);
+}
+
+function getCountryFromCurrentSelection(): string | undefined {
+  const sdk = getWmeSdk();
+
+  if (!sdk) {
+    return undefined;
+  }
+
+  const selection = sdk.Editing?.getSelection?.();
+  if (!selection || selection.objectType !== "venue") {
+    return undefined;
+  }
+
+  const venueId = selection.ids?.[0];
+  if (!venueId) {
+    return undefined;
+  }
+
+  const venue = sdk.DataModel?.Venues?.getById?.({ venueId });
+  if (!venue) {
+    return undefined;
+  }
+
+  return resolveVenueCountryCode(venue);
+}
+
+function getCountryFromVisibleMapContext(): string | undefined {
+  const sdk = getWmeSdk();
+  const countries = sdk?.DataModel?.Countries;
+  const topCountry = resolveCountryCodeFromCountryEntity(
+    countries?.getTopCountry?.()
+  );
+  let centerCountry: string | undefined;
+
+  const mapCenter =
+    sdk?.Map?.getMapCenter?.() ??
+    sdk?.Map?.getCenter?.();
+
+  let lon: number | undefined;
+  let lat: number | undefined;
+
+  if (Array.isArray(mapCenter) && mapCenter.length >= 2) {
+    const [centerLon, centerLat] = mapCenter;
+    if (typeof centerLon === "number" && typeof centerLat === "number") {
+      lon = centerLon;
+      lat = centerLat;
+    }
+  } else if (mapCenter && typeof mapCenter === "object") {
+    const center = mapCenter as Record<string, unknown>;
+    const rawLon = center.lon ?? center.lng ?? center.x;
+    const rawLat = center.lat ?? center.y;
+
+    if (typeof rawLon === "number" && typeof rawLat === "number") {
+      lon = rawLon;
+      lat = rawLat;
+    }
+  }
+
+  if (countries && typeof lon === "number" && typeof lat === "number") {
+    const lookups = [
+      () => countries.getByPoint?.({ lon, lat }),
+      () => countries.getByPoint?.([lon, lat]),
+      () => countries.getByPoint?.(lon, lat),
+      () => countries.getByCoordinates?.({ lon, lat }),
+      () => countries.getByCoordinates?.([lon, lat]),
+      () => countries.getByCoordinates?.(lon, lat),
+      () => countries.getByLocation?.({ lon, lat }),
+      () => countries.getByLocation?.({ lat, lon }),
+      () => countries.getByLocation?.(lon, lat),
+      () => countries.getByLonLat?.({ lon, lat }),
+      () => countries.getByLonLat?.(lon, lat),
+      () => countries.getByLatLon?.({ lat, lon }),
+      () => countries.getByLatLon?.(lat, lon)
+    ];
+
+    for (const lookup of lookups) {
+      try {
+        const result = lookup();
+
+        const entries = Array.isArray(result) ? result : [result];
+        for (const entry of entries) {
+          const country = resolveCountryCodeFromCountryEntity(entry);
+          if (country) {
+            centerCountry = country;
+            break;
+          }
+        }
+
+        if (centerCountry) {
+          break;
+        }
+      } catch {
+        // Ignore lookup shape mismatch and continue with next method.
+      }
+    }
+  }
+
+  const venues = getVisibleVenues();
+  let venueCountry: string | undefined;
+  for (const venue of venues) {
+    const country = resolveVenueCountryCode(venue);
+    if (country) {
+      venueCountry = country;
+      break;
+    }
+  }
+
+  const segments = sdk?.DataModel?.Segments?.getAll?.();
+  let segmentCountry: string | undefined;
+
+  if (Array.isArray(segments)) {
+    for (const segment of segments) {
+      const countryIdCandidates = [
+        segment?.countryID,
+        segment?.countryId,
+        segment?.attributes?.countryID,
+        segment?.attributes?.countryId,
+        segment?.address?.countryID,
+        segment?.address?.countryId
+      ];
+
+      for (const countryId of countryIdCandidates) {
+        const resolved = resolveCountryCodeFromCountryId(countryId);
+        if (resolved) {
+          segmentCountry = resolved;
+          break;
+        }
+      }
+
+      if (segmentCountry) {
+        break;
+      }
+
+      const countryObjectCandidates = [
+        segment?.country,
+        segment?.address?.country
+      ];
+
+      for (const countryObject of countryObjectCandidates) {
+        const resolved = resolveCountryCodeFromCountryEntity(countryObject);
+        if (resolved) {
+          segmentCountry = resolved;
+          break;
+        }
+      }
+
+      if (segmentCountry) {
+        break;
+      }
+    }
+  }
+
+  const hostWindow = (() => {
+    try {
+      if (typeof unsafeWindow !== "undefined") {
+        return unsafeWindow as any;
+      }
+    } catch {
+      // ignore
+    }
+
+    return window as any;
+  })();
+
+  let legacyCountry: string | undefined;
+  const legacySegments = hostWindow?.W?.model?.segments?.objects;
+  const legacyCountriesModel = hostWindow?.W?.model?.countries;
+
+  if (legacySegments && typeof legacySegments === "object") {
+    for (const segment of Object.values(legacySegments) as any[]) {
+      const countryId =
+        segment?.attributes?.countryID ??
+        segment?.attributes?.countryId ??
+        segment?.countryID ??
+        segment?.countryId;
+
+      if (countryId === undefined || countryId === null) {
+        continue;
+      }
+
+      const countryObject =
+        legacyCountriesModel?.getObjectById?.(countryId) ??
+        legacyCountriesModel?.objects?.[countryId];
+
+      const resolved =
+        resolveCountryCodeFromCountryEntity(countryObject?.attributes ?? countryObject) ??
+        resolveCountryCodeFromCountryId(countryId);
+
+      if (resolved) {
+        legacyCountry = resolved;
+        break;
+      }
+    }
+  }
+
+  logger.info(
+    `Map country candidates: top=${topCountry ?? "none"}, center=${centerCountry ?? "none"}, venues=${venueCountry ?? "none"}, segments=${segmentCountry ?? "none"}, legacy=${legacyCountry ?? "none"}`
+  );
+
+  return topCountry ?? centerCountry ?? venueCountry ?? segmentCountry ?? legacyCountry;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function resolveStartupCountry(
+  fallbackCountry?: string,
+  attempts = 8,
+  delayMs = 400
+): Promise<string | undefined> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const mapCountry = getCountryFromVisibleMapContext();
+    const selectionCountry = getCountryFromCurrentSelection();
+    const resolved = mapCountry ?? selectionCountry;
+
+    if (resolved) {
+      logger.info(
+        `Startup country resolved on attempt ${attempt}: ${normalizeCountryCode(resolved)}`
+      );
+      return resolved;
+    }
+
+    if (attempt < attempts) {
+      await wait(delayMs);
+    }
+  }
+
+  return fallbackCountry;
+}
+
+async function loadRuntimeDataForCountry(country?: string): Promise<void> {
+  const normalizedCountry = normalizeCountryCode(country);
+  logger.info(`Loading runtime data for country: ${normalizedCountry ?? "global"}`);
+
+  runtimeConfig = await resolveRuntimeConfig(normalizedCountry);
+  runtimeChains = await resolveRuntimeChains(normalizedCountry);
+  runtimeCountry = normalizedCountry;
+}
 
 async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
   if (!runtimeSettings) {
@@ -103,6 +363,25 @@ async function scanVisibleVenuesFromMap(): Promise<void> {
   }
 
   const venues = getVisibleVenues();
+  let detectedCountry: string | undefined;
+  for (const venue of venues) {
+    const resolved = resolveVenueCountryCode(venue);
+    if (resolved) {
+      detectedCountry = resolved;
+      break;
+    }
+  }
+
+  const targetCountry = resolvePreferredCountry(detectedCountry);
+
+  if (runtimeCountry !== targetCountry) {
+    await loadRuntimeDataForCountry(targetCountry);
+  }
+
+  if (!runtimeConfig || !runtimeChains) {
+    logger.warn("Cannot scan visible venues: runtime not initialized");
+    return;
+  }
 
   logger.info(`Scanning ${venues.length} visible venue(s)`);
 
@@ -119,6 +398,10 @@ async function scanVisibleVenuesFromMap(): Promise<void> {
   if (sidebarState) {
     setSidebarDebugState({
       ...sidebarState,
+      runtimeConfigId: runtimeConfig.id,
+      runtimeConfigVersion: runtimeConfig.version,
+      runtimeChainsId: runtimeChains.id,
+      runtimeChainsCount: runtimeChains.items.length,
       lastStatus: `Scanned ${summary.total} visible venue(s)`,
       lastScanSummary: {
         total: summary.total,
@@ -140,9 +423,19 @@ async function reloadData(): Promise<void> {
 
   logger.info("Reloading runtime data");
 
+  const selectionCountry = getCountryFromCurrentSelection();
+  const mapContextCountry = getCountryFromVisibleMapContext();
+  const preferredCountry =
+    mapContextCountry ??
+    selectionCountry ??
+    runtimeCountry ??
+    runtimeSettings.fallbackCountry;
+  logger.info(
+    `Reload country context: selection=${selectionCountry ?? "none"}, map=${mapContextCountry ?? "none"}, runtime=${runtimeCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings.fallbackCountry) ?? "none"}, chosen=${normalizeCountryCode(preferredCountry) ?? "global"}`
+  );
+
   runtimeManifest = await loadManifest(runtimeSettings.dataChannel);
-  runtimeConfig = await resolveRuntimeConfig();
-  runtimeChains = await resolveRuntimeChains();
+  await loadRuntimeDataForCountry(preferredCountry);
 
   logger.info("Runtime data reloaded");
 
@@ -190,15 +483,13 @@ async function reloadData(): Promise<void> {
     logger.info("Re-analyzing venue after runtime reload");
 
     await analyzeVenue({
-      venue,
-      runtimeConfig,
-      runtimeChains
+      venue
     });
   }
 
 }
 
-function wireApplyButton(runtimeConfig: any, runtimeChains: any): void {
+function wireApplyButton(): void {
   const button = document.getElementById("wmeph-row-apply-selected");
 
   if (!button) {
@@ -271,23 +562,35 @@ function wireApplyButton(runtimeConfig: any, runtimeChains: any): void {
     }
 
     await analyzeVenue({
-      venue: refreshedVenue,
-      runtimeConfig,
-      runtimeChains
+      venue: refreshedVenue
     });
   };
 }
 
 async function analyzeVenue(params: {
   venue: any;
-  runtimeConfig: any;
-  runtimeChains: any;
 }): Promise<void> {
-  const { venue, runtimeConfig, runtimeChains } = params;
+  const { venue } = params;
 
   logger.info(`Selected venue: ${venue.name}`);
 
   const place = mapVenueToPlaceLike(venue);
+  const venueCountry = resolveVenueCountryCode(venue);
+  const targetCountry = resolvePreferredCountry(venueCountry ?? place.country);
+  place.country = targetCountry;
+
+  logger.info(
+    `Country resolved: venue=${venueCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings?.fallbackCountry) ?? "none"}, active=${targetCountry ?? "global"}`
+  );
+
+  if (runtimeCountry !== targetCountry || !runtimeConfig || !runtimeChains) {
+    await loadRuntimeDataForCountry(targetCountry);
+  }
+
+  if (!runtimeConfig || !runtimeChains) {
+    logger.warn("Cannot analyze venue: runtime not initialized");
+    return;
+  }
 
   const matchResult = matchPlaceToChain(place, runtimeChains);
 
@@ -315,15 +618,19 @@ async function analyzeVenue(params: {
   const proposals = generateProposals(issues);
 
   for (const issue of issues) {
-      logger.info(
-        `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
-      );
-    }
+    logger.info(
+      `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
+    );
+  }
 
-    const sidebarState = getSidebarDebugState();
+  const sidebarState = getSidebarDebugState();
   if (sidebarState) {
     setSidebarDebugState({
       ...sidebarState,
+      runtimeConfigId: runtimeConfig.id,
+      runtimeConfigVersion: runtimeConfig.version,
+      runtimeChainsId: runtimeChains.id,
+      runtimeChainsCount: runtimeChains.items.length,
       lastStatus: `Analyzed venue: ${place.name} (${issues.length} issue(s))`
     });
 
@@ -360,7 +667,7 @@ async function analyzeVenue(params: {
       latest.proposals,
       latest.statusMessage
     );
-    wireApplyButton(params.runtimeConfig, params.runtimeChains);
+    wireApplyButton();
   }
 }
 
@@ -381,6 +688,14 @@ export async function startApplication(): Promise<void> {
     return;
   }
 
+  try {
+    await waitForInitialMapDataLoaded();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown initial map data readiness error";
+    logger.warn(`Initial map data not ready yet: ${message}`);
+  }
+
   mountSidebarPlaceholder();
 
   const manifest = await loadManifest(settings.dataChannel);
@@ -389,12 +704,23 @@ export async function startApplication(): Promise<void> {
     `Active manifest loaded: ${manifest.channel} / ${manifest.version} / ${manifest.dataRevision}`
   );
 
-  runtimeConfig = await resolveRuntimeConfig();
+  const selectionCountry = getCountryFromCurrentSelection();
+  const mapContextCountry = getCountryFromVisibleMapContext();
+  const initialCountry = await resolveStartupCountry(settings.fallbackCountry);
+  logger.info(
+    `Startup country context: selection=${selectionCountry ?? "none"}, map=${mapContextCountry ?? "none"}, fallback=${normalizeCountryCode(settings.fallbackCountry) ?? "none"}, chosen=${normalizeCountryCode(initialCountry) ?? "global"}`
+  );
+  await loadRuntimeDataForCountry(initialCountry);
+
+  if (!runtimeConfig || !runtimeChains) {
+    logger.warn("Runtime data failed to initialize");
+    return;
+  }
+
   logger.info(
     `Runtime config loaded: ${runtimeConfig.id} v${runtimeConfig.version}`
   );
 
-  runtimeChains = await resolveRuntimeChains();
   logger.info(
     `Runtime chains loaded: ${runtimeChains.id} with ${runtimeChains.items.length} items`
   );
@@ -450,15 +776,13 @@ export async function startApplication(): Promise<void> {
       latest.proposals,
       latest.statusMessage
     );
-    wireApplyButton(runtimeConfig, runtimeChains);
+    wireApplyButton();
   });
 
   onVenueSelected(
     async (venue) => {
       await analyzeVenue({
-        venue,
-        runtimeConfig,
-        runtimeChains
+        venue
       });
     },
     async () => {

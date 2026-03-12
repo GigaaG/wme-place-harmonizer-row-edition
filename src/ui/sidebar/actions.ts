@@ -59,3 +59,22 @@ export function wireSidebarScanButton(
     }
   };
 }
+
+export function wireSidebarAutoScanToggle(
+  currentValue: boolean,
+  changeHandler: (nextValue: boolean) => Promise<void> | void
+): void {
+  const checkbox = document.getElementById(
+    "wmeph-row-auto-scan-toggle"
+  ) as HTMLInputElement | null;
+
+  if (!checkbox) {
+    return;
+  }
+
+  checkbox.checked = currentValue;
+
+  checkbox.onchange = async () => {
+    await changeHandler(checkbox.checked);
+  };
+}

@@ -34,7 +34,9 @@ import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/
 import { getVisibleVenues } from "../integration/sdk/visible-venues";
 import { scanVisibleVenues } from "./scan-visible-venues";
 import { wireSidebarScanButton } from "../ui/sidebar/actions";
-
+import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";  
+import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
+import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
 
 //
 // Runtime containers
@@ -49,6 +51,34 @@ let runtimeSettings: any | null = null;
 // Functions
 //
 
+async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn("Cannot update auto scan setting: runtime settings unavailable");
+    return;
+  }
+
+  runtimeSettings = {
+    ...runtimeSettings,
+    autoScanVisibleVenues: enabled
+  };
+
+  settingsManager.save(runtimeSettings);
+
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      autoScanVisibleVenues: enabled,
+      lastStatus: enabled
+        ? "Auto scan enabled"
+        : "Auto scan disabled"
+    });
+
+    await rerenderSidebar();
+  }
+}
+
 async function rerenderSidebar(): Promise<void> {
   const state = getSidebarDebugState();
 
@@ -60,6 +90,10 @@ async function rerenderSidebar(): Promise<void> {
   wireSidebarPanelActions();
   wireSidebarReloadButton(reloadData);
   wireSidebarScanButton(scanVisibleVenuesFromMap);
+  wireSidebarAutoScanToggle(
+    !!state.autoScanVisibleVenues,
+    setAutoScanVisibleVenues
+  );
 }
 
 async function scanVisibleVenuesFromMap(): Promise<void> {
@@ -77,6 +111,8 @@ async function scanVisibleVenuesFromMap(): Promise<void> {
     runtimeConfig,
     runtimeChains
   });
+
+  renderHighlights(summary, venues);
 
   const sidebarState = getSidebarDebugState();
 
@@ -372,7 +408,9 @@ export async function startApplication(): Promise<void> {
     runtimeConfigVersion: runtimeConfig.version,
     runtimeChainsId: runtimeChains.id,
     runtimeChainsCount: runtimeChains.items.length,
-    lastStatus: "Ready"
+    lastStatus: "Ready",
+    highlightsEnabled: true,
+    autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true
   });
 
   const sidebarState = getSidebarDebugState();
@@ -381,6 +419,13 @@ export async function startApplication(): Promise<void> {
   }
 
   wireSidebarReloadButton(reloadData);
+
+  ensureHighlightLayer();
+
+  registerAutoScanListeners(
+    () => !!runtimeSettings?.autoScanVisibleVenues,
+    scanVisibleVenuesFromMap
+  );
 
   logger.info("Registering selected venue analysis flow");
 

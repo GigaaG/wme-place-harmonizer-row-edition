@@ -5,4 +5,5 @@ export interface UserSettings {
   dataChannel: DataChannel;
   debugEnabled: boolean;
   fallbackCountry?: string;
+  autoScanVisibleVenues: boolean;
 }

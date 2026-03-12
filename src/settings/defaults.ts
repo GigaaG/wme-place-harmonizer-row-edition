@@ -6,6 +6,7 @@ export function getDefaultSettings(): UserSettings {
     locale: undefined,
     dataChannel: DEFAULT_DATA_CHANNEL,
     debugEnabled: false,
-    fallbackCountry: undefined
+    fallbackCountry: undefined,
+    autoScanVisibleVenues: true
   };
 }

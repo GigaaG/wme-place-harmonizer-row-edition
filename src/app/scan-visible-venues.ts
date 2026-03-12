@@ -3,7 +3,7 @@ import { matchPlaceToChain } from "../matching/chain-matcher";
 import { resolveCategoryStandards } from "../config/category-standards";
 import { resolveEffectivePolicy } from "../config/effective-policy";
 import { evaluatePlace } from "../rules/evaluate-place";
-import type { VisibleVenueScanSummary, ScannedVenueResult } from "../types/scan";
+import type { VisibleVenueScanSummary, ScannedVenueResult, ScanSeverity } from "../types/scan";
 
 export function scanVisibleVenues(params: {
   venues: any[];
@@ -37,11 +37,16 @@ export function scanVisibleVenues(params: {
     const hasErrors = issues.some((issue) => issue.severity === "error");
     const hasWarnings = issues.some((issue) => issue.severity === "warning");
 
+    let severity: ScanSeverity = "ok";
+
     if (hasErrors) {
+      severity = "error";
       error += 1;
     } else if (hasWarnings) {
+      severity = "warning";
       warning += 1;
     } else {
+      severity = "ok";
       ok += 1;
     }
 
@@ -50,7 +55,8 @@ export function scanVisibleVenues(params: {
       name: place.name,
       issueCount: issues.length,
       hasErrors,
-      hasWarnings
+      hasWarnings,
+      severity
     });
   }
 

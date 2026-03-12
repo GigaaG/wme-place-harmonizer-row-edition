@@ -14,6 +14,8 @@ export interface SidebarDebugState {
     warning: number;
     error: number;
   };
+  highlightsEnabled?: boolean;
+  autoScanVisibleVenues?: boolean;
 }
 
 let sidebarDebugState: SidebarDebugState | null = null;

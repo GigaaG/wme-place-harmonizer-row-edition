@@ -77,6 +77,27 @@ export async function renderSidebarDebugPanel(
   }
 
   html += `
+    <div style="margin-bottom:8px;">
+      <b>Highlights</b><br>
+      ${escapeHtml(state.highlightsEnabled ? "Enabled" : "Disabled")}
+    </div>
+  `;
+
+  html += `
+    <div style="margin-bottom:8px;">
+      <b>Auto scan</b><br>
+      <label style="font-size:12px;">
+        <input
+          id="wmeph-row-auto-scan-toggle"
+          type="checkbox"
+          ${state.autoScanVisibleVenues ? "checked" : ""}
+        />
+        Scan visible venues on pan/zoom
+      </label>
+    </div>
+  `;
+
+  html += `
     <div style="margin-top:10px;">
       <button id="wmeph-row-reload-data" type="button">
         Reload data

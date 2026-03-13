@@ -1,7 +1,7 @@
-import { APP_SHORT_NAME } from "./app";
+import { APP_STORAGE_PREFIX } from "./app";
 
 export const STORAGE_KEYS = {
-  settings: `${APP_SHORT_NAME}:settings`,
-  whitelist: `${APP_SHORT_NAME}:whitelist`,
-  cache: `${APP_SHORT_NAME}:cache`
+  settings: `${APP_STORAGE_PREFIX}:settings`,
+  whitelist: `${APP_STORAGE_PREFIX}:whitelist`,
+  cache: `${APP_STORAGE_PREFIX}:cache`
 } as const;

@@ -2,6 +2,12 @@ import { defineConfig, Plugin } from "vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+function getUserscriptFileName(isDevBuild: boolean): string {
+  return isDevBuild
+    ? "wme-place-harmonizer-row-edition.dev.user.js"
+    : "wme-place-harmonizer-row-edition.user.js";
+}
+
 function buildUserscriptBanner(): string {
   const packageJsonPath = resolve(process.cwd(), "package.json");
   const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
@@ -42,24 +48,28 @@ function userscriptHeaderPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [userscriptHeaderPlugin()],
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    sourcemap: true,
-    minify: false,
-    target: "es2020",
-    lib: {
-      entry: resolve(__dirname, "src/main.ts"),
-      formats: ["iife"],
-      name: "WMEPlaceHarmonizerROWEdition"
-    },
-    rollupOptions: {
-      output: {
-        format: "iife",
-        entryFileNames: "wme-place-harmonizer-row-edition.user.js"
+export default defineConfig(({ mode }) => {
+  const isDevBuild = mode === "development";
+
+  return {
+    plugins: [userscriptHeaderPlugin()],
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+      sourcemap: true,
+      minify: false,
+      target: "es2020",
+      lib: {
+        entry: resolve(__dirname, "src/main.ts"),
+        formats: ["iife"],
+        name: "WMEPlaceHarmonizerROWEdition"
+      },
+      rollupOptions: {
+        output: {
+          format: "iife",
+          entryFileNames: getUserscriptFileName(isDevBuild)
+        }
       }
     }
-  }
+  };
 });

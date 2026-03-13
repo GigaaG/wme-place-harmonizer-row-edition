@@ -44,6 +44,7 @@ Voorbeeld:
 
 ```text
 dist/wme-place-harmonizer-row-edition.user.js
+dist/wme-place-harmonizer-row-edition.dev.user.js
 
 Dit bestand is de distributie-output die gebruikers installeren.
 
@@ -364,7 +365,8 @@ Per release is minimaal gewenst:
 
 Voorbeeld:
 
-`dist/wme-place-harmonizer-row-edition.user.js`
+- `dist/wme-place-harmonizer-row-edition.user.js` voor production builds
+- `dist/wme-place-harmonizer-row-edition.dev.user.js` voor development builds
 
 Optioneel later:
 

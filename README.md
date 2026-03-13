@@ -94,7 +94,11 @@ npm run build:prod
 
 The built userscript is written to:
 
-`dist/wme-place-harmonizer-row-edition.user.js`
+- dev build: `dist/wme-place-harmonizer-row-edition.dev.user.js`
+- production build: `dist/wme-place-harmonizer-row-edition.user.js`
+
+Development builds store settings and cache under `WMEPH-ROW:dev:*` in `localStorage`.
+Production builds continue to use `WMEPH-ROW:*`.
 
 ## Load into Tampermonkey
 

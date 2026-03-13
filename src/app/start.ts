@@ -1,4 +1,5 @@
 import { APP_NAME } from "../constants/app";
+import { BUILD_MODE, IS_DEV_SCRIPT_BUILD } from "../constants/build";
 import { logger } from "../logging/logger";
 import { settingsManager } from "../settings/manager";
 import { mountSidebarPlaceholder } from "../integration/sdk/sidebar";
@@ -41,6 +42,7 @@ import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlight
 import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
 import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
 import { normalizeCountryCode } from "../config/country-code";
+import { DATA_REPOSITORY_BRANCH } from "../config/source";
 import {
   resolveVenueCountryCode,
   resolveCountryCodeFromCountryEntity,
@@ -623,6 +625,10 @@ async function analyzeVenue(params: {
     `Country resolved: venue=${venueCountry ?? "none"}, map=${mapContextCountry ?? "none"}, runtime=${runtimeCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings?.fallbackCountry) ?? "none"}, active=${targetCountry ?? "global"}`
   );
 
+  logger.info(
+    `Venue contact fields: rawPhone=${venue.phone ?? "none"}, rawUrl=${venue.url ?? "none"}, mappedPhone=${place.phone ?? "none"}, mappedUrl=${place.url ?? "none"}`
+  );
+
   if (runtimeCountry !== targetCountry || !runtimeConfig || !runtimeChains) {
     await loadRuntimeDataForCountry(targetCountry);
   }
@@ -652,6 +658,9 @@ async function analyzeVenue(params: {
 
   logger.info(
     `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
+  );
+  logger.info(
+    `Formatting config loaded: phone=${runtimeConfig.formatting?.phone ? "yes" : "no"}, url=${runtimeConfig.formatting?.url ? "yes" : "no"}`
   );
 
   const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
@@ -725,6 +734,9 @@ export async function startApplication(): Promise<void> {
   const settings = settingsManager.load();
   runtimeSettings = settings;
   logger.info(`Loaded settings for channel: ${settings.dataChannel}`);
+  logger.info(
+    `Runtime source: buildMode=${BUILD_MODE}, scriptBuild=${IS_DEV_SCRIPT_BUILD ? "dev" : "prod"}, dataBranch=${DATA_REPOSITORY_BRANCH}, dataChannel=${settings.dataChannel}`
+  );
 
   try {
     await waitForWmeSdkReady();

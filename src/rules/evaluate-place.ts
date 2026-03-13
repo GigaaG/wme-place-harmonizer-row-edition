@@ -2,6 +2,7 @@ import type { PlaceLike } from "../types/place";
 import type { EffectivePlacePolicy } from "../types/policy";
 import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
+import type { AddressFieldRequirement, AddressPolicy } from "../types/address";
 
 function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   if (a.length !== b.length) {
@@ -26,6 +27,77 @@ function normalizeExternalProviderIds(ids: string[] | undefined): string[] {
         .filter((id) => id.length > 0)
     )
   );
+}
+
+const ADDRESS_FIELD_METADATA: Array<{
+  key: keyof AddressPolicy;
+  label: string;
+}> = [
+  { key: "city", label: "city" },
+  { key: "street", label: "street name" },
+  { key: "houseNumber", label: "house number" }
+];
+
+function hasText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function pushAddressIssue(params: {
+  issues: PlaceIssue[];
+  fieldKey: keyof AddressPolicy;
+  label: string;
+  requirement: AddressFieldRequirement;
+  currentValue: string | undefined;
+}): void {
+  const { issues, fieldKey, label, requirement, currentValue } = params;
+  const hasValue = hasText(currentValue);
+  const field = `address.${fieldKey}`;
+  const ruleId = `address.${fieldKey}.${requirement}`;
+
+  if (requirement === "required" && !hasValue) {
+    issues.push({
+      field,
+      severity: "error",
+      message: `Address must include ${label}`,
+      expectedValue: "present",
+      ruleId
+    });
+    return;
+  }
+
+  if (requirement === "recommended" && !hasValue) {
+    issues.push({
+      field,
+      severity: "warning",
+      message: `Address should include ${label}`,
+      expectedValue: "present",
+      ruleId
+    });
+    return;
+  }
+
+  if (requirement === "discouraged" && hasValue) {
+    issues.push({
+      field,
+      severity: "warning",
+      message: `Address should not include ${label}`,
+      currentValue,
+      expectedValue: "absent",
+      ruleId
+    });
+    return;
+  }
+
+  if (requirement === "forbidden" && hasValue) {
+    issues.push({
+      field,
+      severity: "error",
+      message: `Address must not include ${label}`,
+      currentValue,
+      expectedValue: "absent",
+      ruleId
+    });
+  }
 }
 
 export function evaluatePlace(
@@ -226,6 +298,28 @@ export function evaluatePlace(
       expectedValue: expectedExternalProviderIds,
       ruleId: "externalProvider.match"
     });
+  }
+
+  //
+  // ADDRESS
+  //
+
+  if (policy.address) {
+    for (const { key, label } of ADDRESS_FIELD_METADATA) {
+      const requirement = policy.address[key];
+
+      if (!requirement) {
+        continue;
+      }
+
+      pushAddressIssue({
+        issues,
+        fieldKey: key,
+        label,
+        requirement,
+        currentValue: place.address?.[key]
+      });
+    }
   }
 
   //

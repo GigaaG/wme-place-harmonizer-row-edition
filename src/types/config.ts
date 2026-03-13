@@ -1,4 +1,5 @@
 import type { GeometryType } from "./chains";
+import type { AddressPolicy } from "./address";
 
 export interface ConfigMeta {
   name?: string;
@@ -35,6 +36,7 @@ export interface CategoryStandard {
   requireOpeningHours?: boolean;
   requireExternalProvider?: boolean;
   services?: ServiceStandard;
+  address?: AddressPolicy;
 }
 
 export interface HarmonizerConfig {

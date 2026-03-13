@@ -1,3 +1,5 @@
+import type { PlaceAddress } from "./address";
+
 export type GeometryType = "point" | "polygon";
 
 export interface OpeningHourDefinition {
@@ -22,6 +24,7 @@ export interface PlaceLike {
 
   openingHours?: OpeningHourDefinition[];
   externalProviderIds?: string[];
+  address?: PlaceAddress;
 
   country?: string;
 }

@@ -1,4 +1,5 @@
 import type { ChainPolicyDefinition, GeometryPolicy, ServicePolicy } from "../types/chains";
+import type { AddressPolicy } from "../types/address";
 import type { CategoryStandard } from "../types/config";
 import type { EffectivePlacePolicy } from "../types/policy";
 
@@ -32,6 +33,20 @@ function mergeServicePolicy(
   };
 }
 
+function mergeAddressPolicy(
+  base?: AddressPolicy,
+  override?: AddressPolicy
+): AddressPolicy | undefined {
+  if (!base && !override) {
+    return undefined;
+  }
+
+  return {
+    ...base,
+    ...override
+  };
+}
+
 function mergeCategoryStandardIntoPolicy(
   current: EffectivePlacePolicy,
   standard: CategoryStandard
@@ -46,7 +61,8 @@ function mergeCategoryStandardIntoPolicy(
       standard.requireOpeningHours ?? current.requireOpeningHours,
     requireExternalProvider:
       standard.requireExternalProvider ?? current.requireExternalProvider,
-    services: mergeServicePolicy(current.services, standard.services)
+    services: mergeServicePolicy(current.services, standard.services),
+    address: mergeAddressPolicy(current.address, standard.address)
   };
 }
 
@@ -68,7 +84,8 @@ function mergeChainPolicyIntoPolicy(
       chainPolicy.requireOpeningHours ?? current.requireOpeningHours,
     requireExternalProvider:
       chainPolicy.requireExternalProvider ?? current.requireExternalProvider,
-    services: mergeServicePolicy(current.services, chainPolicy.services)
+    services: mergeServicePolicy(current.services, chainPolicy.services),
+    address: mergeAddressPolicy(current.address, chainPolicy.address)
   };
 }
 

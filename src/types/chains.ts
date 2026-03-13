@@ -1,3 +1,5 @@
+import type { AddressPolicy } from "./address";
+
 export type GeometryType = "point" | "polygon";
 
 export interface GeometryPolicy {
@@ -45,6 +47,7 @@ export interface ChainPolicyDefinition {
   requireOpeningHours?: boolean;
   requireExternalProvider?: boolean;
   services?: ServicePolicy;
+  address?: AddressPolicy;
 }
 
 export interface ChainScopeDefinition {

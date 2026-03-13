@@ -1,30 +1,34 @@
 import type { ChainDataset, ChainRecord } from "../types/chains";
 
-function mergeChainRecord(base: ChainRecord, override: ChainRecord): ChainRecord {
-  return {
-    ...base,
-    ...override,
-    match: {
-      ...base.match,
-      ...override.match
-    },
-    standard: {
-      ...base.standard,
-      ...override.standard
-    },
-    policy: {
-      ...base.policy,
-      ...override.policy
-    },
-    scope: {
-      ...base.scope,
-      ...override.scope
-    },
-    meta: {
-      ...base.meta,
-      ...override.meta
-    }
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepMerge<T>(base: T, override: T): T {
+  if (!isPlainObject(base) || !isPlainObject(override)) {
+    return override;
+  }
+
+  const result: Record<string, unknown> = {
+    ...base
   };
+
+  for (const [key, overrideValue] of Object.entries(override)) {
+    const baseValue = result[key];
+
+    if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+      result[key] = deepMerge(baseValue, overrideValue);
+      continue;
+    }
+
+    result[key] = overrideValue;
+  }
+
+  return result as T;
+}
+
+function mergeChainRecord(base: ChainRecord, override: ChainRecord): ChainRecord {
+  return deepMerge(base, override);
 }
 
 export function mergeChainDatasets(

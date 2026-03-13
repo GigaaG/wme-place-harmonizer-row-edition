@@ -1,4 +1,5 @@
 import type { GeometryPolicy, ServicePolicy } from "./chains";
+import type { AddressPolicy } from "./address";
 
 export interface EffectivePlacePolicy {
   geometry?: GeometryPolicy;
@@ -8,4 +9,5 @@ export interface EffectivePlacePolicy {
   requireOpeningHours?: boolean;
   requireExternalProvider?: boolean;
   services?: ServicePolicy;
+  address?: AddressPolicy;
 }

@@ -1,6 +1,12 @@
 import { getWmeSdk } from "./wme";
 
 type BBox = [number, number, number, number];
+interface Bounds {
+  left: number;
+  bottom: number;
+  right: number;
+  top: number;
+}
 
 function isCoordinateInsideExtent(
   lon: number,
@@ -15,51 +21,100 @@ function isCoordinateInsideExtent(
     lat <= top;
 }
 
-function getVenueCenter(venue: any): { lon: number; lat: number } | null {
+function getBoundsForPolygonCoordinates(coordinates: number[][][]): Bounds | null {
+  if (!Array.isArray(coordinates) || coordinates.length === 0) {
+    return null;
+  }
+
+  const outerRing = coordinates[0];
+
+  if (!Array.isArray(outerRing) || outerRing.length === 0) {
+    return null;
+  }
+
+  let left = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.POSITIVE_INFINITY;
+  let top = Number.NEGATIVE_INFINITY;
+  let hasPoint = false;
+
+  for (const point of outerRing) {
+    const [lon, lat] = point ?? [];
+
+    if (typeof lon !== "number" || typeof lat !== "number") {
+      continue;
+    }
+
+    left = Math.min(left, lon);
+    right = Math.max(right, lon);
+    bottom = Math.min(bottom, lat);
+    top = Math.max(top, lat);
+    hasPoint = true;
+  }
+
+  if (!hasPoint) {
+    return null;
+  }
+
+  return {
+    left,
+    bottom,
+    right,
+    top
+  };
+}
+
+function intersectsExtent(bounds: Bounds, extent: BBox): boolean {
+  const [extentLeft, extentBottom, extentRight, extentTop] = extent;
+
+  return (
+    bounds.right >= extentLeft &&
+    bounds.left <= extentRight &&
+    bounds.top >= extentBottom &&
+    bounds.bottom <= extentTop
+  );
+}
+
+function isVenueVisible(venue: any, extent: BBox): boolean {
   const geometry = venue.geometry;
 
   if (!geometry) {
-    return null;
+    return false;
   }
 
   if (geometry.type === "Point" || geometry.type === "point") {
     const [lon, lat] = geometry.coordinates ?? [];
-
     if (typeof lon === "number" && typeof lat === "number") {
-      return { lon, lat };
+      return isCoordinateInsideExtent(lon, lat, extent);
     }
+
+    return false;
   }
 
   if (geometry.type === "Polygon" || geometry.type === "polygon") {
-    const ring = geometry.coordinates?.[0];
+    const polygonBounds = getBoundsForPolygonCoordinates(geometry.coordinates);
+    return !!polygonBounds && intersectsExtent(polygonBounds, extent);
+  }
 
-    if (!Array.isArray(ring) || ring.length === 0) {
-      return null;
+  if (geometry.type === "MultiPolygon" || geometry.type === "multipolygon") {
+    const polygons = geometry.coordinates;
+
+    if (!Array.isArray(polygons)) {
+      return false;
     }
 
-    let lonSum = 0;
-    let latSum = 0;
-    let count = 0;
+    for (const polygonCoordinates of polygons) {
+      const polygonBounds = getBoundsForPolygonCoordinates(polygonCoordinates);
 
-    for (const point of ring) {
-      const [lon, lat] = point ?? [];
-
-      if (typeof lon === "number" && typeof lat === "number") {
-        lonSum += lon;
-        latSum += lat;
-        count += 1;
+      if (polygonBounds && intersectsExtent(polygonBounds, extent)) {
+        return true;
       }
     }
 
-    if (count > 0) {
-      return {
-        lon: lonSum / count,
-        lat: latSum / count
-      };
-    }
+    return false;
   }
 
-  return null;
+  return false;
 }
 
 export function getVisibleVenues(): any[] {
@@ -76,13 +131,5 @@ export function getVisibleVenues(): any[] {
     return [];
   }
 
-  return allVenues.filter((venue: any) => {
-    const center = getVenueCenter(venue);
-
-    if (!center) {
-      return false;
-    }
-
-    return isCoordinateInsideExtent(center.lon, center.lat, extent);
-  });
+  return allVenues.filter((venue: any) => isVenueVisible(venue, extent));
 }

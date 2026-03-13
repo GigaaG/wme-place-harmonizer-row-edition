@@ -349,14 +349,16 @@ async function rerenderSidebar(): Promise<void> {
   await renderSidebarDebugPanel(state);
   wireSidebarPanelActions();
   wireSidebarReloadButton(reloadData);
-  wireSidebarScanButton(scanVisibleVenuesFromMap);
+  wireSidebarScanButton(() => scanVisibleVenuesFromMap("manual"));
   wireSidebarAutoScanToggle(
     !!state.autoScanVisibleVenues,
     setAutoScanVisibleVenues
   );
 }
 
-async function scanVisibleVenuesFromMap(): Promise<void> {
+async function scanVisibleVenuesFromMap(
+  trigger: "manual" | "auto" = "manual"
+): Promise<void> {
   if (!runtimeConfig || !runtimeChains) {
     logger.warn("Cannot scan visible venues: runtime not initialized");
     return;
@@ -391,7 +393,15 @@ async function scanVisibleVenuesFromMap(): Promise<void> {
     runtimeChains
   });
 
-  renderHighlights(summary, venues);
+  const highlightRenderResult = renderHighlights(summary, venues, {
+    keepExistingOnEmpty: trigger === "auto"
+  });
+
+  let statusText = `Scanned ${summary.total} visible venue(s)`;
+
+  if (highlightRenderResult.keptExisting) {
+    statusText = "Auto scan found no drawable venues; keeping previous highlights";
+  }
 
   const sidebarState = getSidebarDebugState();
 
@@ -402,7 +412,7 @@ async function scanVisibleVenuesFromMap(): Promise<void> {
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
       runtimeChainsCount: runtimeChains.items.length,
-      lastStatus: `Scanned ${summary.total} visible venue(s)`,
+      lastStatus: statusText,
       lastScanSummary: {
         total: summary.total,
         ok: summary.ok,
@@ -750,7 +760,7 @@ export async function startApplication(): Promise<void> {
 
   registerAutoScanListeners(
     () => !!runtimeSettings?.autoScanVisibleVenues,
-    scanVisibleVenuesFromMap
+    () => scanVisibleVenuesFromMap("auto")
   );
 
   logger.info("Registering selected venue analysis flow");

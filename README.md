@@ -25,6 +25,7 @@ The code MVP includes:
 - chain matching
 - category-based standards
 - issue detection
+- config-driven phone format validation
 - proposal generation
 - selective apply flow for supported fields
 - feature editor integration

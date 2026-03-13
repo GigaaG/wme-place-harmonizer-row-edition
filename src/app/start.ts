@@ -654,7 +654,9 @@ async function analyzeVenue(params: {
     `Effective policy resolved: ${JSON.stringify(effectivePolicy)}`
   );
 
-  const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
+  const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
+    phoneFormatting: runtimeConfig.formatting?.phone
+  });
   const editorLockLevel = getCurrentEditorLockLevel();
   const proposals = generateProposals(issues, { editorLockLevel });
 

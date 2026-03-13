@@ -10,7 +10,7 @@
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
     "lint": "eslint src --ext .ts",
-    "test": "node -e \"console.log('No tests configured yet')\"",
+    "test": "node --experimental-strip-types --experimental-specifier-resolution=node tests/evaluate-place.phone-format.test.ts",
     "release:dev": "npm run build:dev",
     "release:stable": "npm run build:prod"
   },

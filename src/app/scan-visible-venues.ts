@@ -32,7 +32,9 @@ export function scanVisibleVenues(params: {
       chainPolicy: matchResult.chain?.policy
     });
 
-    const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
+    const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
+      phoneFormatting: runtimeConfig.formatting?.phone
+    });
 
     const hasErrors = issues.some((issue) => issue.severity === "error");
     const hasWarnings = issues.some((issue) => issue.severity === "warning");

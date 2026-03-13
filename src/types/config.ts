@@ -16,6 +16,18 @@ export interface RuleConfig {
   severity?: "info" | "warning" | "error";
 }
 
+export interface PhoneFormattingConfig {
+  countryCode?: string;
+  formatStyle?: "national" | "international";
+  validationPatterns?: string[];
+  validationExamples?: string[];
+  validationMessage?: string;
+}
+
+export interface FormattingConfig {
+  phone?: PhoneFormattingConfig;
+}
+
 export interface GeometryStandard {
   required?: GeometryType;
   recommended?: GeometryType;
@@ -50,7 +62,7 @@ export interface HarmonizerConfig {
   scope?: ConfigScope;
 
   defaults?: Record<string, unknown>;
-  formatting?: Record<string, unknown>;
+  formatting?: FormattingConfig;
   matching?: Record<string, unknown>;
   highlighting?: Record<string, unknown>;
 

@@ -3,6 +3,8 @@ import type { EffectivePlacePolicy } from "../types/policy";
 import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
 import type { AddressPolicy, PresenceRequirement } from "../types/address";
+import type { PhoneFormattingConfig } from "../types/config";
+import { buildPhoneFormatIssue } from "./phone-format.ts";
 
 function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   if (a.length !== b.length) {
@@ -127,7 +129,10 @@ function pushAddressIssue(params: {
 export function evaluatePlace(
   place: PlaceLike,
   policy: EffectivePlacePolicy,
-  chain?: ChainRecord
+  chain?: ChainRecord,
+  options?: {
+    phoneFormatting?: PhoneFormattingConfig;
+  }
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
   const externalProviderIds = normalizeExternalProviderIds(
@@ -217,6 +222,14 @@ export function evaluatePlace(
         forbidden: "Phone number must not be provided"
       }
     });
+
+    if (issue) {
+      issues.push(issue);
+    }
+  }
+
+  if (hasText(place.phone)) {
+    const issue = buildPhoneFormatIssue(place.phone, options?.phoneFormatting);
 
     if (issue) {
       issues.push(issue);

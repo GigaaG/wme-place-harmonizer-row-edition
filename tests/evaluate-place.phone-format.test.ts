@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 
 import { evaluatePlace } from "../src/rules/evaluate-place.ts";
+import { generateProposals } from "../src/proposals/generate-proposals.ts";
 import type { EffectivePlacePolicy } from "../src/types/policy.ts";
 import type { PlaceLike } from "../src/types/place.ts";
 import type { PhoneFormattingConfig } from "../src/types/config.ts";
+import type { PlaceIssue } from "../src/types/issue.ts";
 
 const dutchPhoneFormatting: PhoneFormattingConfig = {
   countryCode: "+31",
@@ -36,6 +38,12 @@ function getPhoneIssueRuleIds(
   })
     .filter((issue) => issue.field === "phone")
     .map((issue) => issue.ruleId ?? "");
+}
+
+function getPhoneFormatIssue(phone: string): PlaceIssue | undefined {
+  return evaluatePlace(buildPlace(phone), {}, undefined, {
+    phoneFormatting: dutchPhoneFormatting
+  }).find((issue) => issue.ruleId === "phoneValidation.format");
 }
 
 function runTest(name: string, fn: () => void): void {
@@ -89,5 +97,33 @@ runTest("keeps presence and format validation independent", () => {
   assert.deepEqual(
     getPhoneIssueRuleIds("06 12345678", { phone: "forbidden" }),
     ["phoneValidation.forbidden", "phoneValidation.format"]
+  );
+});
+
+runTest("creates applyable phone-format proposals for normalizable numbers", () => {
+  const issue = getPhoneFormatIssue("020-1234567");
+
+  assert.ok(issue);
+  assert.equal(issue.expectedValue, "+31 20 1234567");
+
+  const proposals = generateProposals([issue]);
+
+  assert.equal(proposals.length, 1);
+  assert.equal(proposals[0].field, "phone");
+  assert.equal(proposals[0].proposedValue, "+31 20 1234567");
+  assert.equal(proposals[0].issueRuleId, "phoneValidation.format");
+  assert.equal(proposals[0].isApplySupported, true);
+  assert.equal(proposals[0].actionType, "set-field");
+});
+
+runTest("normalizes service and international separator variants when possible", () => {
+  assert.equal(getPhoneFormatIssue("08001234")?.expectedValue, "0800 1234");
+  assert.equal(
+    getPhoneFormatIssue("+31 (0)20 123 4567")?.expectedValue,
+    "+31 20 1234567"
+  );
+  assert.equal(
+    getPhoneFormatIssue("0032-3-123-45-67")?.expectedValue,
+    "+32 3 123 45 67"
   );
 });

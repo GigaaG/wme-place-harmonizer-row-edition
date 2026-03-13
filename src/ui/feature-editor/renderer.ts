@@ -93,6 +93,14 @@ function renderIssue(
       </div>
     `;
 
+    if (proposal.reason && proposal.reason !== issue.message) {
+      html += `
+        <div style="font-size:12px;color:#666;margin-top:4px;">
+          ${escapeHtml(proposal.reason)}
+        </div>
+      `;
+    }
+
     if (proposal.isApplySupported) {
       html += `
         <label style="display:block;margin-top:6px;font-size:12px;">

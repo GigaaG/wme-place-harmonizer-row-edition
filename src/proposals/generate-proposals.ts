@@ -3,12 +3,22 @@ import type { PlaceProposal } from "../types/proposal";
 
 const APPLY_SUPPORTED_FIELDS = new Set([
   "name",
+  "lockLevel",
   "phone",
   "url",
   "openingHours"
 ]);
 
-export function generateProposals(issues: PlaceIssue[]): PlaceProposal[] {
+function readInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value)
+    ? value
+    : undefined;
+}
+
+export function generateProposals(
+  issues: PlaceIssue[],
+  options?: { editorLockLevel?: number }
+): PlaceProposal[] {
   const proposals: PlaceProposal[] = [];
 
   for (const issue of issues) {
@@ -72,6 +82,47 @@ export function generateProposals(issues: PlaceIssue[]): PlaceProposal[] {
         issueRuleId: issue.ruleId,
         isApplySupported: isPolygonToPoint,
         actionType: isPolygonToPoint ? "set-field" : "manual-only"
+      });
+      continue;
+    }
+
+    //
+    // Lock level met editor-rank cap
+    //
+    if (issue.field === "lockLevel") {
+      const currentLockLevel = readInteger(issue.currentValue);
+      const recommendedLockLevel = readInteger(issue.expectedValue);
+      const editorLockLevel = readInteger(options?.editorLockLevel);
+
+      if (recommendedLockLevel === undefined) {
+        continue;
+      }
+
+      const appliedLockLevel =
+        editorLockLevel !== undefined
+          ? Math.min(recommendedLockLevel, editorLockLevel)
+          : recommendedLockLevel;
+
+      const canApply =
+        currentLockLevel === undefined ||
+        appliedLockLevel > currentLockLevel;
+      const isCappedByEditor =
+        editorLockLevel !== undefined &&
+        editorLockLevel < recommendedLockLevel;
+      const reason = isCappedByEditor
+        ? canApply
+          ? `${issue.message}. Apply will raise the venue to ${appliedLockLevel}, capped by your editor lock level ${editorLockLevel}.`
+          : `${issue.message}. Your editor lock level ${editorLockLevel} cannot raise this venue further.`
+        : issue.message;
+
+      proposals.push({
+        field: "lockLevel",
+        currentValue: currentLockLevel,
+        proposedValue: canApply ? appliedLockLevel : recommendedLockLevel,
+        reason,
+        issueRuleId: issue.ruleId,
+        isApplySupported: canApply,
+        actionType: canApply ? "set-field" : "manual-only"
       });
       continue;
     }

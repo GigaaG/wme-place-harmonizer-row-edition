@@ -67,6 +67,25 @@ export function evaluatePlace(
   }
 
   //
+  // LOCK LEVEL
+  //
+
+  if (
+    policy.lockLevel !== undefined &&
+    place.lockLevel !== undefined &&
+    place.lockLevel < policy.lockLevel
+  ) {
+    issues.push({
+      field: "lockLevel",
+      severity: "warning",
+      message: `Lock level should be at least ${policy.lockLevel}`,
+      currentValue: place.lockLevel,
+      expectedValue: policy.lockLevel,
+      ruleId: "lockLevelRecommendation"
+    });
+  }
+
+  //
   // PHONE
   //
 

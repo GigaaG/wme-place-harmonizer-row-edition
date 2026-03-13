@@ -1,5 +1,5 @@
 import { logger } from "../../logging/logger";
-import { getWmeSdk } from "./wme";
+import { getCurrentEditorLockLevel, getWmeSdk } from "./wme";
 import type { PlaceProposal } from "../../types/proposal";
 
 interface ApplyResult {
@@ -34,7 +34,8 @@ function buildUpdatedServices(
 function buildUpdateArgs(
   venueId: string,
   currentServices: string[],
-  proposals: PlaceProposal[]
+  proposals: PlaceProposal[],
+  editorLockLevel?: number
 ): Record<string, unknown> {
   const args: Record<string, unknown> = { venueId };
 
@@ -59,6 +60,23 @@ function buildUpdateArgs(
       case "name":
         args.name = proposal.proposedValue as string;
         break;
+      case "lockLevel": {
+        const requestedLockLevel = proposal.proposedValue;
+
+        if (
+          typeof requestedLockLevel === "number" &&
+          Number.isInteger(requestedLockLevel) &&
+          requestedLockLevel >= 1
+        ) {
+          const appliedLockLevel =
+            typeof editorLockLevel === "number"
+              ? Math.min(requestedLockLevel, editorLockLevel)
+              : requestedLockLevel;
+
+          args.lockRank = appliedLockLevel - 1;
+        }
+        break;
+      }
       case "phone":
         args.phone = proposal.proposedValue as string;
         break;
@@ -102,7 +120,13 @@ export function applyVenueProposals(
     };
   }
 
-  const args = buildUpdateArgs(venueId, currentServices, supported);
+  const editorLockLevel = getCurrentEditorLockLevel();
+  const args = buildUpdateArgs(
+    venueId,
+    currentServices,
+    supported,
+    editorLockLevel
+  );
 
   try {
     sdk.DataModel.Venues.updateVenue(args);

@@ -16,6 +16,7 @@ export interface PlaceLike {
   url?: string;
 
   geometry?: GeometryType;
+  lockLevel?: number;
 
   services?: string[];
 

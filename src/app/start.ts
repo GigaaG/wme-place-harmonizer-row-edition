@@ -14,6 +14,7 @@ import { evaluatePlace } from "../rules/evaluate-place";
 import {
   waitForWmeSdkReady,
   waitForInitialMapDataLoaded,
+  getCurrentEditorLockLevel,
   getWmeSdk
 } from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
@@ -625,12 +626,17 @@ async function analyzeVenue(params: {
   );
 
   const issues = evaluatePlace(place, effectivePolicy, matchResult.chain);
-  const proposals = generateProposals(issues);
+  const editorLockLevel = getCurrentEditorLockLevel();
+  const proposals = generateProposals(issues, { editorLockLevel });
 
   for (const issue of issues) {
     logger.info(
       `[ISSUE] ${issue.severity.toUpperCase()} ${issue.field}: ${issue.message}`
     );
+  }
+
+  if (editorLockLevel !== undefined) {
+    logger.info(`Editor lock level resolved: ${editorLockLevel}`);
   }
 
   const sidebarState = getSidebarDebugState();

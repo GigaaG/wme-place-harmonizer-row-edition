@@ -109,6 +109,7 @@ The built userscript is written to:
 
 - selected venue analysis
 - issue cards
+- lock level recommendation issues
 - suggestions / proposals
 - apply selected fixes for supported fields
 - venue-only rendering
@@ -135,6 +136,7 @@ The MVP currently supports selective apply for a limited set of fields.
 ### Examples include
 
 - name
+- lock level
 - phone
 - url
 - services

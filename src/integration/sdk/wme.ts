@@ -53,6 +53,41 @@ export function getWmeSdk(): any | null {
   }
 }
 
+function readNumericValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+export function getCurrentEditorLockLevel(): number | undefined {
+  const sdk = getWmeSdk();
+
+  const userInfoCandidates = [
+    (() => {
+      try {
+        return sdk?.State?.getUserInfo?.();
+      } catch {
+        return undefined;
+      }
+    })(),
+    sdk?.State?.userInfo
+  ];
+
+  for (const userInfo of userInfoCandidates) {
+    const rank = readNumericValue(userInfo?.rank);
+
+    if (
+      typeof rank === "number" &&
+      Number.isInteger(rank) &&
+      rank >= 0
+    ) {
+      return rank + 1;
+    }
+  }
+
+  return undefined;
+}
+
 export function getWmeContext(): WmeContext {
   const sdk = getWmeSdk();
 

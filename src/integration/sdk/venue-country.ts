@@ -7,6 +7,27 @@ const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   "the netherlands": "nl"
 };
 
+const COUNTRY_ALPHA_FIELDS = [
+  "code",
+  "abbr",
+  "iso2",
+  "iso",
+  "iso3",
+  "alpha2",
+  "alpha3",
+  "countryCode",
+  "isoCode",
+  "id",
+  "countryId",
+  "countryID"
+];
+
+const COUNTRY_NAME_FIELDS = [
+  "name",
+  "fullName",
+  "displayName"
+];
+
 function normalizeAlphaCountryCode(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -34,30 +55,43 @@ function resolveCountryCodeFromName(value: unknown): string | undefined {
   return COUNTRY_NAME_TO_CODE[key];
 }
 
-function resolveCountryCodeFromObject(country: any): string | undefined {
-  if (!country || typeof country !== "object") {
-    return undefined;
-  }
-
-  const fields = [
-    "code",
-    "abbr",
-    "iso2",
-    "iso",
-    "alpha2",
-    "countryCode",
-    "isoCode",
-    "id"
-  ];
-
-  for (const field of fields) {
-    const candidate = normalizeAlphaCountryCode(country[field]);
+function resolveCountryCodeFromRecord(record: Record<string, unknown>): string | undefined {
+  for (const field of COUNTRY_ALPHA_FIELDS) {
+    const candidate = normalizeAlphaCountryCode(record[field]);
     if (candidate) {
       return candidate;
     }
   }
 
-  return resolveCountryCodeFromName(country.name);
+  for (const field of COUNTRY_NAME_FIELDS) {
+    const candidate = resolveCountryCodeFromName(record[field]);
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveCountryCodeFromObject(country: any): string | undefined {
+  if (!country || typeof country !== "object") {
+    return undefined;
+  }
+
+  const candidates = [country, country.attributes];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+
+    const resolved = resolveCountryCodeFromRecord(candidate as Record<string, unknown>);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return undefined;
 }
 
 export function resolveCountryCodeFromCountryEntity(country: any): string | undefined {
@@ -124,7 +158,11 @@ function findCountryById(countryId: unknown): any {
   }
 
   return allCountries.find((country: any) => {
-    const id = country?.id ?? country?.countryId;
+    const id =
+      country?.id ??
+      country?.countryId ??
+      country?.attributes?.id ??
+      country?.attributes?.countryId;
     if (typeof id === "number" && typeof normalizedId === "number") {
       return id === normalizedId;
     }
@@ -148,12 +186,34 @@ export function resolveVenueCountryCode(venue: any): string | undefined {
     venue?.address?.country?.abbr,
     venue?.address?.country?.iso2,
     venue?.address?.country?.iso,
+    venue?.address?.country?.alpha2,
     venue?.address?.countryCode,
     venue?.address?.countryId,
     venue?.address?.countryID,
+    venue?.country?.code,
+    venue?.country?.abbr,
+    venue?.country?.iso2,
+    venue?.country?.iso,
+    venue?.country?.alpha2,
     venue?.countryCode,
     venue?.countryId,
-    venue?.countryID
+    venue?.countryID,
+    venue?.attributes?.address?.country?.code,
+    venue?.attributes?.address?.country?.abbr,
+    venue?.attributes?.address?.country?.iso2,
+    venue?.attributes?.address?.country?.iso,
+    venue?.attributes?.address?.country?.alpha2,
+    venue?.attributes?.address?.countryCode,
+    venue?.attributes?.address?.countryId,
+    venue?.attributes?.address?.countryID,
+    venue?.attributes?.country?.code,
+    venue?.attributes?.country?.abbr,
+    venue?.attributes?.country?.iso2,
+    venue?.attributes?.country?.iso,
+    venue?.attributes?.country?.alpha2,
+    venue?.attributes?.countryCode,
+    venue?.attributes?.countryId,
+    venue?.attributes?.countryID
   ];
 
   for (const candidate of directCandidates) {
@@ -163,17 +223,41 @@ export function resolveVenueCountryCode(venue: any): string | undefined {
     }
   }
 
-  const nestedCountry = resolveCountryCodeFromObject(venue?.address?.country);
-  if (nestedCountry) {
-    return nestedCountry;
+  const nestedCountryCandidates = [
+    venue?.address?.country,
+    venue?.country,
+    venue?.attributes?.address?.country,
+    venue?.attributes?.country
+  ];
+
+  for (const candidate of nestedCountryCandidates) {
+    const nestedCountry = resolveCountryCodeFromObject(candidate);
+    if (nestedCountry) {
+      return nestedCountry;
+    }
   }
 
   const countryIdCandidates = [
     venue?.address?.country?.id,
+    venue?.address?.country?.countryId,
+    venue?.address?.country?.countryID,
     venue?.address?.countryId,
     venue?.address?.countryID,
+    venue?.country?.id,
+    venue?.country?.countryId,
+    venue?.country?.countryID,
     venue?.countryId,
-    venue?.countryID
+    venue?.countryID,
+    venue?.attributes?.address?.country?.id,
+    venue?.attributes?.address?.country?.countryId,
+    venue?.attributes?.address?.country?.countryID,
+    venue?.attributes?.address?.countryId,
+    venue?.attributes?.address?.countryID,
+    venue?.attributes?.country?.id,
+    venue?.attributes?.country?.countryId,
+    venue?.attributes?.country?.countryID,
+    venue?.attributes?.countryId,
+    venue?.attributes?.countryID
   ];
 
   for (const countryId of countryIdCandidates) {

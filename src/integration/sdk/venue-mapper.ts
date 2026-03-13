@@ -1,4 +1,6 @@
 import type { PlaceLike, GeometryType, OpeningHourDefinition } from "../../types/place";
+import { normalizeCategoryKeys } from "../../config/category-key";
+import { resolveVenueCountryCode } from "./venue-country";
 
 function mapGeometry(geometry: any): GeometryType | undefined {
   if (geometry?.type === "Point" || geometry?.type === "point") {
@@ -82,10 +84,23 @@ function mapLockLevel(venue: any): number | undefined {
   return undefined;
 }
 
+function mapCategories(venue: any): string[] {
+  return normalizeCategoryKeys([
+    ...(Array.isArray(venue?.categories) ? venue.categories : []),
+    ...(Array.isArray(venue?.attributes?.categories)
+      ? venue.attributes.categories
+      : []),
+    venue?.primaryCategory,
+    venue?.category,
+    venue?.attributes?.primaryCategory,
+    venue?.attributes?.category
+  ]);
+}
+
 export function mapVenueToPlaceLike(venue: any): PlaceLike {
   return {
     name: venue.name ?? "",
-    categories: venue.categories ?? [],
+    categories: mapCategories(venue),
     brand: venue.brand ?? undefined,
     aliases: venue.aliases ?? [],
 
@@ -100,6 +115,6 @@ export function mapVenueToPlaceLike(venue: any): PlaceLike {
     openingHours: mapOpeningHours(venue.openingHours),
     externalProviderIds: venue.externalProviderIds ?? [],
 
-    country: venue.address?.country?.id ?? undefined
+    country: resolveVenueCountryCode(venue)
   };
 }

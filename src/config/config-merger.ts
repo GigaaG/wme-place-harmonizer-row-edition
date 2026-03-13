@@ -1,41 +1,35 @@
 import type { HarmonizerConfig } from "../types/config";
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function deepMerge<T>(base: T, override: T): T {
+  if (!isPlainObject(base) || !isPlainObject(override)) {
+    return override;
+  }
+
+  const result: Record<string, unknown> = {
+    ...base
+  };
+
+  for (const [key, overrideValue] of Object.entries(override)) {
+    const baseValue = result[key];
+
+    if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+      result[key] = deepMerge(baseValue, overrideValue);
+      continue;
+    }
+
+    result[key] = overrideValue;
+  }
+
+  return result as T;
+}
+
 export function mergeConfigs(
   base: HarmonizerConfig,
   override: HarmonizerConfig
 ): HarmonizerConfig {
-  return {
-    ...base,
-    ...override,
-
-    defaults: {
-      ...base.defaults,
-      ...override.defaults
-    },
-
-    formatting: {
-      ...base.formatting,
-      ...override.formatting
-    },
-
-    matching: {
-      ...base.matching,
-      ...override.matching
-    },
-
-    highlighting: {
-      ...base.highlighting,
-      ...override.highlighting
-    },
-
-    rules: {
-      ...base.rules,
-      ...override.rules
-    },
-
-    categoryStandards: {
-      ...base.categoryStandards,
-      ...override.categoryStandards
-    }
-  };
+  return deepMerge(base, override);
 }

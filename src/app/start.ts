@@ -61,14 +61,27 @@ let runtimeCountry: string | undefined;
 // Functions
 //
 
-function resolvePreferredCountry(placeCountry?: string): string | undefined {
-  const normalizedPlaceCountry = normalizeCountryCode(placeCountry);
+function resolvePreferredCountry(params: {
+  primaryCountry?: string;
+  mapContextCountry?: string;
+  runtimeCountry?: string;
+  fallbackCountry?: string;
+}): string | undefined {
+  const candidates = [
+    params.primaryCountry,
+    params.mapContextCountry,
+    params.runtimeCountry,
+    params.fallbackCountry
+  ];
 
-  if (normalizedPlaceCountry) {
-    return normalizedPlaceCountry;
+  for (const candidate of candidates) {
+    const normalizedCountry = normalizeCountryCode(candidate);
+    if (normalizedCountry) {
+      return normalizedCountry;
+    }
   }
 
-  return normalizeCountryCode(runtimeSettings?.fallbackCountry);
+  return undefined;
 }
 
 function getCountryFromCurrentSelection(): string | undefined {
@@ -375,7 +388,17 @@ async function scanVisibleVenuesFromMap(
     }
   }
 
-  const targetCountry = resolvePreferredCountry(detectedCountry);
+  const mapContextCountry = getCountryFromVisibleMapContext();
+  const targetCountry = resolvePreferredCountry({
+    primaryCountry: detectedCountry,
+    mapContextCountry,
+    runtimeCountry,
+    fallbackCountry: runtimeSettings?.fallbackCountry
+  });
+
+  logger.info(
+    `Scan country resolved: detected=${detectedCountry ?? "none"}, map=${mapContextCountry ?? "none"}, runtime=${runtimeCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings?.fallbackCountry) ?? "none"}, active=${targetCountry ?? "global"}`
+  );
 
   if (runtimeCountry !== targetCountry) {
     await loadRuntimeDataForCountry(targetCountry);
@@ -587,11 +610,17 @@ async function analyzeVenue(params: {
 
   const place = mapVenueToPlaceLike(venue);
   const venueCountry = resolveVenueCountryCode(venue);
-  const targetCountry = resolvePreferredCountry(venueCountry ?? place.country);
+  const mapContextCountry = getCountryFromVisibleMapContext();
+  const targetCountry = resolvePreferredCountry({
+    primaryCountry: venueCountry ?? place.country,
+    mapContextCountry,
+    runtimeCountry,
+    fallbackCountry: runtimeSettings?.fallbackCountry
+  });
   place.country = targetCountry;
 
   logger.info(
-    `Country resolved: venue=${venueCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings?.fallbackCountry) ?? "none"}, active=${targetCountry ?? "global"}`
+    `Country resolved: venue=${venueCountry ?? "none"}, map=${mapContextCountry ?? "none"}, runtime=${runtimeCountry ?? "none"}, fallback=${normalizeCountryCode(runtimeSettings?.fallbackCountry) ?? "none"}, active=${targetCountry ?? "global"}`
   );
 
   if (runtimeCountry !== targetCountry || !runtimeConfig || !runtimeChains) {

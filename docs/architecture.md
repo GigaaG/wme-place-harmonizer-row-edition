@@ -151,7 +151,10 @@ De actieve configuratie wordt bepaald op basis van:
 
 1. place country, indien beschikbaar
 2. editor/map-context
-3. handmatige fallback-keuze bij onvoldoende zekerheid
+3. laatst geldige runtime-country, zolang die context nog leidend is
+4. handmatige fallback-keuze bij onvoldoende zekerheid
+
+Place-country wordt runtime-genormaliseerd vanuit de SDK op basis van zowel country-codevelden als country-id-velden op venue- en address-objecten.
 
 Community-config kan meerdere landen dekken. Een country-config kan daarom verwijzen naar of erven van een communityprofiel.
 

@@ -7,16 +7,14 @@ export function getSelectedProposals(
     document.querySelectorAll<HTMLInputElement>(".wmeph-row-apply-checkbox")
   );
 
-  const selectedKeys = new Set(
+  const selectedIds = new Set(
     checkboxes
       .filter((checkbox) => checkbox.checked)
-      .map(
-        (checkbox) =>
-          `${checkbox.dataset.field ?? ""}::${checkbox.dataset.ruleId ?? ""}`
-      )
+      .map((checkbox) => checkbox.dataset.proposalId ?? "")
+      .filter((proposalId) => proposalId.length > 0)
   );
 
-  return proposals.filter((proposal) =>
-    selectedKeys.has(`${proposal.field}::${proposal.issueRuleId ?? ""}`)
+  return proposals.filter(
+    (proposal) => proposal.id && selectedIds.has(proposal.id)
   );
 }

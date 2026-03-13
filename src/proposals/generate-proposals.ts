@@ -19,6 +19,14 @@ function isPresenceExpectation(value: unknown): value is "present" | "absent" {
   return value === "present" || value === "absent";
 }
 
+function buildProposalId(issue: PlaceIssue, suffix?: string): string {
+  return [
+    issue.groupKey ?? issue.field,
+    issue.ruleId ?? "no-rule",
+    suffix ?? String(issue.expectedValue ?? issue.currentValue ?? "")
+  ].join("::");
+}
+
 export function generateProposals(
   issues: PlaceIssue[],
   options?: { editorLockLevel?: number }
@@ -41,9 +49,12 @@ export function generateProposals(
 
       if (issue.ruleId?.startsWith("services.required.") || issue.ruleId?.startsWith("services.recommended.")) {
         proposals.push({
+          id: buildProposalId(issue, serviceName),
           field: "services",
+          groupKey: issue.groupKey,
           currentValue: issue.currentValue,
           proposedValue: serviceName,
+          displayProposedValue: serviceName,
           reason: issue.message,
           issueRuleId: issue.ruleId,
           isApplySupported: true,
@@ -58,9 +69,12 @@ export function generateProposals(
         issue.ruleId?.startsWith("services.forbidden.")
       ) {
         proposals.push({
+          id: buildProposalId(issue, serviceName),
           field: "services",
+          groupKey: issue.groupKey,
           currentValue: issue.currentValue,
           proposedValue: serviceName,
+          displayProposedValue: serviceName,
           reason: issue.message,
           issueRuleId: issue.ruleId,
           isApplySupported: true,
@@ -69,6 +83,25 @@ export function generateProposals(
         });
         continue;
       }
+    }
+
+    if (issue.field === "aliases" && typeof issue.expectedValue === "string") {
+      const aliasName = issue.expectedValue;
+
+      proposals.push({
+        id: buildProposalId(issue, aliasName),
+        field: "aliases",
+        groupKey: issue.groupKey,
+        currentValue: issue.currentValue,
+        proposedValue: aliasName,
+        displayProposedValue: aliasName,
+        reason: issue.message,
+        issueRuleId: issue.ruleId,
+        isApplySupported: true,
+        actionType: "add-alias",
+        aliasName
+      });
+      continue;
     }
 
     //
@@ -82,7 +115,9 @@ export function generateProposals(
       const isPointToPolygon = current === "point" && expected === "polygon";
 
       proposals.push({
+        id: buildProposalId(issue),
         field: "geometry",
+        groupKey: issue.groupKey,
         currentValue: current,
         proposedValue: expected,
         reason: issue.message,
@@ -123,7 +158,9 @@ export function generateProposals(
         : issue.message;
 
       proposals.push({
+        id: buildProposalId(issue),
         field: "lockLevel",
+        groupKey: issue.groupKey,
         currentValue: currentLockLevel,
         proposedValue: canApply ? appliedLockLevel : recommendedLockLevel,
         reason,
@@ -143,7 +180,9 @@ export function generateProposals(
 
     if (issue.expectedValue !== undefined) {
       proposals.push({
+        id: buildProposalId(issue),
         field: issue.field,
+        groupKey: issue.groupKey,
         currentValue: issue.currentValue,
         proposedValue: issue.expectedValue,
         reason: issue.message,

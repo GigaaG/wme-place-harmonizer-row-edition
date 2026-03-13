@@ -4,6 +4,7 @@ import type { AddressPolicy, PresenceRequirement } from "./address";
 export interface EffectivePlacePolicy {
   geometry?: GeometryPolicy;
   lockLevel?: number;
+  cityInVenueName?: boolean;
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;

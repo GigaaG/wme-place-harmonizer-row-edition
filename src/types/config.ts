@@ -51,6 +51,7 @@ export interface ServiceStandard {
 export interface CategoryStandard {
   geometry?: GeometryStandard;
   lockLevel?: number;
+  cityInVenueName?: boolean;
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;

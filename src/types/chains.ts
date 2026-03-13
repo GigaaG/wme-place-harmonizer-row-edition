@@ -43,6 +43,7 @@ export interface ChainStandardDefinition {
 export interface ChainPolicyDefinition {
   geometry?: GeometryPolicy;
   lockLevel?: number;
+  cityInVenueName?: boolean;
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;

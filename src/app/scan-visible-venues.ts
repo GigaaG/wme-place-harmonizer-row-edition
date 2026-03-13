@@ -33,6 +33,7 @@ export function scanVisibleVenues(params: {
     });
 
     const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
+      cityInVenueNameRule: runtimeConfig.rules?.cityInVenueName,
       phoneFormatting: runtimeConfig.formatting?.phone,
       urlFormatting: runtimeConfig.formatting?.url
     });

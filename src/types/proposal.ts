@@ -1,6 +1,7 @@
 export interface PlaceProposal {
   id?: string;
   field: string;
+  groupKey?: string;
   currentValue?: unknown;
   proposedValue?: unknown;
   displayCurrentValue?: string;
@@ -14,6 +15,13 @@ export interface PlaceProposal {
   issueRuleId?: string;
   isApplySupported: boolean;
 
-  actionType?: "set-field" | "add-service" | "remove-service" | "manual-only";
+  actionType?:
+    | "set-field"
+    | "add-service"
+    | "remove-service"
+    | "add-alias"
+    | "remove-alias"
+    | "manual-only";
   serviceName?: string;
+  aliasName?: string;
 }

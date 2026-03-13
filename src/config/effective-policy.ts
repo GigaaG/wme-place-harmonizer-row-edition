@@ -111,6 +111,7 @@ function mergeCategoryStandardIntoPolicy(
     ...current,
     geometry: mergeGeometryPolicy(current.geometry, standard.geometry),
     lockLevel: standard.lockLevel ?? current.lockLevel,
+    cityInVenueName: standard.cityInVenueName ?? current.cityInVenueName,
     phone: mergePresenceRequirement(
       current.phone,
       standard.phone,
@@ -165,6 +166,7 @@ function mergeChainPolicyIntoPolicy(
     ...current,
     geometry: mergeGeometryPolicy(current.geometry, chainPolicy.geometry),
     lockLevel: chainPolicy.lockLevel ?? current.lockLevel,
+    cityInVenueName: chainPolicy.cityInVenueName ?? current.cityInVenueName,
     phone: mergePresenceRequirement(
       current.phone,
       chainPolicy.phone,

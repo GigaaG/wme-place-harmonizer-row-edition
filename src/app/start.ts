@@ -658,6 +658,7 @@ function wireApplyButton(): void {
     const result = await applyVenueProposals(
       latest.venueId,
       latest.currentServices,
+      latest.currentAliases,
       selected
     );
 
@@ -783,6 +784,7 @@ async function analyzeVenue(params: {
   );
 
   const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
+    cityInVenueNameRule: runtimeConfig.rules?.cityInVenueName,
     phoneFormatting: runtimeConfig.formatting?.phone,
     urlFormatting: runtimeConfig.formatting?.url
   });
@@ -825,6 +827,7 @@ async function analyzeVenue(params: {
     issues,
     proposals,
     currentServices: place.services ?? [],
+    currentAliases: place.aliases ?? [],
     currentExternalProviderIds: place.externalProviderIds ?? [],
     isVenueSelection: true,
     statusMessage: previous?.statusMessage

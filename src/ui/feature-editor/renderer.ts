@@ -1,17 +1,7 @@
-import type { PlaceIssue } from "../../types/issue";
 import { ensureFeatureEditorContainer } from "./container";
+import type { PlaceIssue } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
-
-function findProposalsForIssue(
-  issue: PlaceIssue,
-  proposals: PlaceProposal[]
-): PlaceProposal[] {
-  return proposals.filter(
-    (proposal) =>
-      proposal.field === issue.field &&
-      proposal.issueRuleId === issue.ruleId
-  );
-}
+import { groupIssuesForFeatureEditor } from "./issue-groups";
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -143,8 +133,7 @@ function renderProposal(
         <input
           type="checkbox"
           class="wmeph-row-apply-checkbox"
-          data-field="${escapeHtml(proposal.field)}"
-          data-rule-id="${escapeHtml(proposal.issueRuleId ?? "")}"
+          data-proposal-id="${escapeHtml(proposal.id ?? "")}"
         />
         Apply this fix
       </label>
@@ -171,8 +160,6 @@ function renderIssue(
   issue: PlaceIssue,
   proposals: PlaceProposal[]
 ): string {
-  const issueProposals = findProposalsForIssue(issue, proposals);
-
   let html = "";
 
   html += `
@@ -199,8 +186,8 @@ function renderIssue(
     `;
   }
 
-  for (let index = 0; index < issueProposals.length; index += 1) {
-    html += renderProposal(issue, issueProposals[index], index);
+  for (let index = 0; index < proposals.length; index += 1) {
+    html += renderProposal(issue, proposals[index], index);
   }
 
   html += `</div>`;
@@ -222,6 +209,7 @@ export function renderFeatureEditorAnalysis(
   }
 
   let html = "";
+  const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
 
   html += `
   <div style="
@@ -283,11 +271,11 @@ export function renderFeatureEditorAnalysis(
   html += `
     <div style="margin-bottom:8px;">
       <div><b>Issues</b></div>
-      <div>${issues.length}</div>
+      <div>${issueGroups.length}</div>
     </div>
   `;
 
-  if (issues.length === 0) {
+  if (issueGroups.length === 0) {
     html += `
       <div style="
         border: 1px solid #ddd;
@@ -300,8 +288,15 @@ export function renderFeatureEditorAnalysis(
       </div>
     `;
   } else {
-    for (const issue of issues) {
-      html += renderIssue(issue, proposals);
+    for (const group of issueGroups) {
+      html += renderIssue(
+        {
+          field: group.field,
+          severity: group.severity,
+          message: group.message
+        },
+        group.proposals
+      );
     }
   }
 

@@ -4,6 +4,7 @@ import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
 import type { AddressPolicy, PresenceRequirement } from "../types/address";
 import type {
+  RuleConfig,
   PhoneFormattingConfig,
   UrlFormattingConfig
 } from "../types/config";
@@ -35,6 +36,20 @@ function normalizeExternalProviderIds(ids: string[] | undefined): string[] {
   );
 }
 
+function normalizeAliases(aliases: string[] | undefined): string[] {
+  if (!Array.isArray(aliases)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      aliases
+        .map((alias) => normalizeWhitespace(String(alias)))
+        .filter((alias) => alias.length > 0)
+    )
+  );
+}
+
 const ADDRESS_FIELD_METADATA: Array<{
   key: keyof AddressPolicy;
   label: string;
@@ -46,6 +61,46 @@ const ADDRESS_FIELD_METADATA: Array<{
 
 function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function containsWholeCityName(name: string, city: string): boolean {
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(city)}([^\\p{L}\\p{N}]|$)`, "iu");
+  return pattern.test(name);
+}
+
+function stripCityFromVenueName(name: string, city: string): string | undefined {
+  const trimmedName = normalizeWhitespace(name);
+  const trimmedCity = normalizeWhitespace(city);
+
+  if (!trimmedName || !trimmedCity || !containsWholeCityName(trimmedName, trimmedCity)) {
+    return undefined;
+  }
+
+  const removalPatterns = [
+    new RegExp(`\\s*\\(${escapeRegExp(trimmedCity)}\\)\\s*$`, "iu"),
+    new RegExp(`\\s*[,\\-|/|]\\s*${escapeRegExp(trimmedCity)}\\s*$`, "iu"),
+    new RegExp(`^${escapeRegExp(trimmedCity)}\\s*[-,:/|]\\s*`, "iu"),
+    new RegExp(`\\s+${escapeRegExp(trimmedCity)}\\s*$`, "iu"),
+    new RegExp(`^${escapeRegExp(trimmedCity)}\\s+`, "iu")
+  ];
+
+  for (const pattern of removalPatterns) {
+    const updated = normalizeWhitespace(trimmedName.replace(pattern, " "));
+
+    if (updated && updated !== trimmedName) {
+      return updated;
+    }
+  }
+
+  return undefined;
 }
 
 function buildPresenceIssue(params: {
@@ -135,15 +190,21 @@ export function evaluatePlace(
   policy: EffectivePlacePolicy,
   chain?: ChainRecord,
   options?: {
+    cityInVenueNameRule?: RuleConfig;
     phoneFormatting?: PhoneFormattingConfig;
     urlFormatting?: UrlFormattingConfig;
   }
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
+  const aliases = normalizeAliases(place.aliases);
   const externalProviderIds = normalizeExternalProviderIds(
     place.externalProviderIds
   );
   const hasExternalProviders = externalProviderIds.length > 0;
+  const cityInVenueNameRule = options?.cityInVenueNameRule;
+  const isCityInVenueNameEnabled =
+    policy.cityInVenueName ?? cityInVenueNameRule?.enabled ?? false;
+  const cityInVenueNameSeverity = cityInVenueNameRule?.severity ?? "warning";
 
   //
   // NAME
@@ -159,6 +220,25 @@ export function evaluatePlace(
       expectedValue: expectedName,
       ruleId: "nameNormalization"
     });
+  }
+
+  if (
+    !expectedName &&
+    isCityInVenueNameEnabled &&
+    hasText(place.address?.city)
+  ) {
+    const suggestedName = stripCityFromVenueName(place.name, place.address.city);
+
+    if (suggestedName) {
+      issues.push({
+        field: "name",
+        severity: cityInVenueNameSeverity,
+        message: `Venue name should not include city name "${place.address.city}"`,
+        currentValue: place.name,
+        expectedValue: suggestedName,
+        ruleId: "cityInVenueName"
+      });
+    }
   }
 
   //
@@ -334,6 +414,50 @@ export function evaluatePlace(
   }
 
   //
+  // ALIASES
+  //
+
+  const requiredAliases = normalizeAliases(chain?.standard?.aliases);
+  const optionalAliases = normalizeAliases(chain?.standard?.optionalAliases);
+  const normalizedCurrentAliases = new Set(
+    aliases.map((alias) => alias.toLocaleLowerCase())
+  );
+
+  for (const requiredAlias of requiredAliases) {
+    if (normalizedCurrentAliases.has(requiredAlias.toLocaleLowerCase())) {
+      continue;
+    }
+
+    issues.push({
+      field: "aliases",
+      severity: "warning",
+      message: `Suggested alias missing: ${requiredAlias}`,
+      groupKey: "aliases.suggested",
+      groupMessage: "Suggested aliases missing",
+      currentValue: aliases,
+      expectedValue: requiredAlias,
+      ruleId: `aliases.suggested.${requiredAlias}`
+    });
+  }
+
+  for (const optionalAlias of optionalAliases) {
+    if (normalizedCurrentAliases.has(optionalAlias.toLocaleLowerCase())) {
+      continue;
+    }
+
+    issues.push({
+      field: "aliases",
+      severity: "info",
+      message: `Optional alias suggestion: ${optionalAlias}`,
+      groupKey: "aliases.suggested",
+      groupMessage: "Suggested aliases missing",
+      currentValue: aliases,
+      expectedValue: optionalAlias,
+      ruleId: `aliases.optional.${optionalAlias}`
+    });
+  }
+
+  //
   // EXTERNAL PROVIDER IDS
   //
 
@@ -412,6 +536,8 @@ export function evaluatePlace(
             field: "services",
             severity: "error",
             message: `Required service missing: ${required}`,
+            groupKey: "services.required",
+            groupMessage: "Required services missing",
             currentValue: services,
             expectedValue: required,
             ruleId: `services.required.${required}`
@@ -427,6 +553,8 @@ export function evaluatePlace(
             field: "services",
             severity: "warning",
             message: `Recommended service missing: ${recommended}`,
+            groupKey: "services.recommended",
+            groupMessage: "Recommended services missing",
             currentValue: services,
             expectedValue: recommended,
             ruleId: `services.recommended.${recommended}`
@@ -442,6 +570,8 @@ export function evaluatePlace(
             field: "services",
             severity: "warning",
             message: `Discouraged service present: ${discouraged}`,
+            groupKey: "services.discouraged",
+            groupMessage: "Discouraged services present",
             currentValue: services,
             expectedValue: discouraged,
             ruleId: `services.discouraged.${discouraged}`
@@ -457,6 +587,8 @@ export function evaluatePlace(
             field: "services",
             severity: "error",
             message: `Forbidden service present: ${forbidden}`,
+            groupKey: "services.forbidden",
+            groupMessage: "Forbidden services present",
             currentValue: services,
             expectedValue: forbidden,
             ruleId: `services.forbidden.${forbidden}`

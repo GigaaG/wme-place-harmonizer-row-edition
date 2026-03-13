@@ -32,9 +32,33 @@ function buildUpdatedServices(
   return Array.from(result.values());
 }
 
+function buildUpdatedAliases(
+  currentAliases: string[],
+  proposals: PlaceProposal[]
+): string[] {
+  const result = new Set(currentAliases);
+
+  for (const proposal of proposals) {
+    if (proposal.field !== "aliases" || !proposal.aliasName) {
+      continue;
+    }
+
+    if (proposal.actionType === "add-alias") {
+      result.add(proposal.aliasName);
+    }
+
+    if (proposal.actionType === "remove-alias") {
+      result.delete(proposal.aliasName);
+    }
+  }
+
+  return Array.from(result.values());
+}
+
 function buildUpdateArgs(
   venueId: string,
   currentServices: string[],
+  currentAliases: string[],
   proposals: PlaceProposal[],
   editorLockLevel?: number
 ): Record<string, unknown> {
@@ -48,12 +72,20 @@ function buildUpdateArgs(
     args.services = buildUpdatedServices(currentServices, serviceProposals);
   }
 
+  const aliasProposals = proposals.filter(
+    (proposal) => proposal.field === "aliases" && proposal.isApplySupported
+  );
+
+  if (aliasProposals.length > 0) {
+    args.aliases = buildUpdatedAliases(currentAliases, aliasProposals);
+  }
+
   for (const proposal of proposals) {
     if (!proposal.isApplySupported) {
       continue;
     }
 
-    if (proposal.field === "services") {
+    if (proposal.field === "services" || proposal.field === "aliases") {
       continue;
     }
 
@@ -98,6 +130,7 @@ function buildUpdateArgs(
 export async function applyVenueProposals(
   venueId: string,
   currentServices: string[],
+  currentAliases: string[],
   proposals: PlaceProposal[]
 ): Promise<ApplyResult> {
   const supported = proposals.filter((proposal) => proposal.isApplySupported);
@@ -129,6 +162,7 @@ export async function applyVenueProposals(
       const args = buildUpdateArgs(
         venueId,
         currentServices,
+        currentAliases,
         sdkSupported,
         editorLockLevel
       );

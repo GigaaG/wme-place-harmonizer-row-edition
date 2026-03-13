@@ -15,6 +15,10 @@ function readInteger(value: unknown): number | undefined {
     : undefined;
 }
 
+function isPresenceExpectation(value: unknown): value is "present" | "absent" {
+  return value === "present" || value === "absent";
+}
+
 export function generateProposals(
   issues: PlaceIssue[],
   options?: { editorLockLevel?: number }
@@ -49,7 +53,10 @@ export function generateProposals(
         continue;
       }
 
-      if (issue.ruleId?.startsWith("services.forbidden.")) {
+      if (
+        issue.ruleId?.startsWith("services.discouraged.") ||
+        issue.ruleId?.startsWith("services.forbidden.")
+      ) {
         proposals.push({
           field: "services",
           currentValue: issue.currentValue,
@@ -130,6 +137,10 @@ export function generateProposals(
     //
     // Gewone set-field proposals
     //
+    if (isPresenceExpectation(issue.expectedValue)) {
+      continue;
+    }
+
     if (issue.expectedValue !== undefined) {
       proposals.push({
         field: issue.field,

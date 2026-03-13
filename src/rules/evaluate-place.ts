@@ -2,7 +2,7 @@ import type { PlaceLike } from "../types/place";
 import type { EffectivePlacePolicy } from "../types/policy";
 import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
-import type { AddressFieldRequirement, AddressPolicy } from "../types/address";
+import type { AddressPolicy, PresenceRequirement } from "../types/address";
 
 function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   if (a.length !== b.length) {
@@ -42,61 +42,85 @@ function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function buildPresenceIssue(params: {
+  field: string;
+  rulePrefix: string;
+  requirement: PresenceRequirement;
+  hasValue: boolean;
+  currentValue?: unknown;
+  messages: Record<PresenceRequirement, string>;
+}): PlaceIssue | undefined {
+  const { field, rulePrefix, requirement, hasValue, currentValue, messages } =
+    params;
+  const ruleId = `${rulePrefix}.${requirement}`;
+
+  if (requirement === "required" && !hasValue) {
+    return {
+      field,
+      severity: "error",
+      message: messages.required,
+      expectedValue: "present",
+      ruleId
+    };
+  }
+
+  if (requirement === "recommended" && !hasValue) {
+    return {
+      field,
+      severity: "warning",
+      message: messages.recommended,
+      expectedValue: "present",
+      ruleId
+    };
+  }
+
+  if (requirement === "discouraged" && hasValue) {
+    return {
+      field,
+      severity: "warning",
+      message: messages.discouraged,
+      currentValue,
+      expectedValue: "absent",
+      ruleId
+    };
+  }
+
+  if (requirement === "forbidden" && hasValue) {
+    return {
+      field,
+      severity: "error",
+      message: messages.forbidden,
+      currentValue,
+      expectedValue: "absent",
+      ruleId
+    };
+  }
+}
+
 function pushAddressIssue(params: {
   issues: PlaceIssue[];
   fieldKey: keyof AddressPolicy;
   label: string;
-  requirement: AddressFieldRequirement;
+  requirement: PresenceRequirement;
   currentValue: string | undefined;
 }): void {
   const { issues, fieldKey, label, requirement, currentValue } = params;
-  const hasValue = hasText(currentValue);
-  const field = `address.${fieldKey}`;
-  const ruleId = `address.${fieldKey}.${requirement}`;
+  const issue = buildPresenceIssue({
+    field: `address.${fieldKey}`,
+    rulePrefix: `address.${fieldKey}`,
+    requirement,
+    hasValue: hasText(currentValue),
+    currentValue,
+    messages: {
+      required: `Address must include ${label}`,
+      recommended: `Address should include ${label}`,
+      discouraged: `Address should not include ${label}`,
+      forbidden: `Address must not include ${label}`
+    }
+  });
 
-  if (requirement === "required" && !hasValue) {
-    issues.push({
-      field,
-      severity: "error",
-      message: `Address must include ${label}`,
-      expectedValue: "present",
-      ruleId
-    });
-    return;
-  }
-
-  if (requirement === "recommended" && !hasValue) {
-    issues.push({
-      field,
-      severity: "warning",
-      message: `Address should include ${label}`,
-      expectedValue: "present",
-      ruleId
-    });
-    return;
-  }
-
-  if (requirement === "discouraged" && hasValue) {
-    issues.push({
-      field,
-      severity: "warning",
-      message: `Address should not include ${label}`,
-      currentValue,
-      expectedValue: "absent",
-      ruleId
-    });
-    return;
-  }
-
-  if (requirement === "forbidden" && hasValue) {
-    issues.push({
-      field,
-      severity: "error",
-      message: `Address must not include ${label}`,
-      currentValue,
-      expectedValue: "absent",
-      ruleId
-    });
+  if (issue) {
+    issues.push(issue);
   }
 }
 
@@ -179,14 +203,23 @@ export function evaluatePlace(
   // PHONE
   //
 
-  if (policy.requirePhone) {
-    if (!place.phone || place.phone.trim().length === 0) {
-      issues.push({
-        field: "phone",
-        severity: "error",
-        message: "Phone number is required",
-        ruleId: "phoneValidation"
-      });
+  if (policy.phone) {
+    const issue = buildPresenceIssue({
+      field: "phone",
+      rulePrefix: "phoneValidation",
+      requirement: policy.phone,
+      hasValue: hasText(place.phone),
+      currentValue: place.phone,
+      messages: {
+        required: "Phone number is required",
+        recommended: "Phone number is recommended",
+        discouraged: "Phone number should not be provided",
+        forbidden: "Phone number must not be provided"
+      }
+    });
+
+    if (issue) {
+      issues.push(issue);
     }
   }
 
@@ -194,14 +227,23 @@ export function evaluatePlace(
   // URL
   //
 
-  if (policy.requireUrl) {
-    if (!place.url || place.url.trim().length === 0) {
-      issues.push({
-        field: "url",
-        severity: "error",
-        message: "URL is required",
-        ruleId: "urlValidation"
-      });
+  if (policy.url) {
+    const issue = buildPresenceIssue({
+      field: "url",
+      rulePrefix: "urlValidation",
+      requirement: policy.url,
+      hasValue: hasText(place.url),
+      currentValue: place.url,
+      messages: {
+        required: "URL is required",
+        recommended: "URL is recommended",
+        discouraged: "URL should not be provided",
+        forbidden: "URL must not be provided"
+      }
+    });
+
+    if (issue) {
+      issues.push(issue);
     }
   }
 
@@ -221,14 +263,23 @@ export function evaluatePlace(
   // OPENING HOURS
   //
 
-  if (policy.requireOpeningHours) {
-    if (!place.openingHours || place.openingHours.length === 0) {
-      issues.push({
-        field: "openingHours",
-        severity: "error",
-        message: "Opening hours are required",
-        ruleId: "openingHours.required"
-      });
+  if (policy.openingHours) {
+    const issue = buildPresenceIssue({
+      field: "openingHours",
+      rulePrefix: "openingHours",
+      requirement: policy.openingHours,
+      hasValue: Boolean(place.openingHours && place.openingHours.length > 0),
+      currentValue: place.openingHours,
+      messages: {
+        required: "Opening hours are required",
+        recommended: "Opening hours are recommended",
+        discouraged: "Opening hours should not be provided",
+        forbidden: "Opening hours must not be provided"
+      }
+    });
+
+    if (issue) {
+      issues.push(issue);
     }
   }
 
@@ -260,25 +311,24 @@ export function evaluatePlace(
   // EXTERNAL PROVIDER IDS
   //
 
-  if (policy.requireExternalProvider === true && !hasExternalProviders) {
-    issues.push({
+  if (policy.externalProviderIds) {
+    const issue = buildPresenceIssue({
       field: "externalProviderIds",
-      severity: "error",
-      message: "At least one external provider id is required",
+      rulePrefix: "externalProvider",
+      requirement: policy.externalProviderIds,
+      hasValue: hasExternalProviders,
       currentValue: externalProviderIds,
-      ruleId: "externalProvider.required"
+      messages: {
+        required: "At least one external provider id is required",
+        recommended: "At least one external provider id is recommended",
+        discouraged: "External provider ids should not be provided",
+        forbidden: "Venue must not have external provider ids"
+      }
     });
-  }
 
-  if (policy.requireExternalProvider === false && hasExternalProviders) {
-    issues.push({
-      field: "externalProviderIds",
-      severity: "error",
-      message: "Venue should not have external providers",
-      currentValue: externalProviderIds,
-      expectedValue: [],
-      ruleId: "externalProvider.forbidden"
-    });
+    if (issue) {
+      issues.push(issue);
+    }
   }
 
   const expectedExternalProviderIds = chain?.standard?.externalProviderIds;
@@ -354,6 +404,21 @@ export function evaluatePlace(
             currentValue: services,
             expectedValue: recommended,
             ruleId: `services.recommended.${recommended}`
+          });
+        }
+      }
+    }
+
+    if (policy.services.discouraged) {
+      for (const discouraged of policy.services.discouraged) {
+        if (services.includes(discouraged)) {
+          issues.push({
+            field: "services",
+            severity: "warning",
+            message: `Discouraged service present: ${discouraged}`,
+            currentValue: services,
+            expectedValue: discouraged,
+            ruleId: `services.discouraged.${discouraged}`
           });
         }
       }

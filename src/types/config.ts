@@ -1,5 +1,5 @@
 import type { GeometryType } from "./chains";
-import type { AddressPolicy } from "./address";
+import type { AddressPolicy, PresenceRequirement } from "./address";
 
 export interface ConfigMeta {
   name?: string;
@@ -25,16 +25,17 @@ export interface GeometryStandard {
 export interface ServiceStandard {
   required?: string[];
   recommended?: string[];
+  discouraged?: string[];
   forbidden?: string[];
 }
 
 export interface CategoryStandard {
   geometry?: GeometryStandard;
   lockLevel?: number;
-  requirePhone?: boolean;
-  requireUrl?: boolean;
-  requireOpeningHours?: boolean;
-  requireExternalProvider?: boolean;
+  phone?: PresenceRequirement;
+  url?: PresenceRequirement;
+  openingHours?: PresenceRequirement;
+  externalProviderIds?: PresenceRequirement;
   services?: ServiceStandard;
   address?: AddressPolicy;
 }

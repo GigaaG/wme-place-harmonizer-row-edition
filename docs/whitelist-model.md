@@ -187,7 +187,7 @@ Een whitelist-entry bevat idealiter:
 ```json
 {
   "placeId": "123456789",
-  "ruleId": "phoneValidation",
+  "ruleId": "phoneValidation.required",
   "field": "phone",
   "scope": "place",
   "createdAt": "2026-03-10T10:00:00Z",
@@ -251,7 +251,7 @@ Voorbeeld:
   "items": [
     {
       "placeId": "123456789",
-      "ruleId": "phoneValidation",
+      "ruleId": "phoneValidation.required",
       "field": "phone",
       "scope": "place",
       "createdAt": "2026-03-10T10:00:00Z",
@@ -392,7 +392,7 @@ Optioneel kan ook getoond worden:
   "items": [
     {
       "placeId": "123456789",
-      "ruleId": "phoneValidation",
+      "ruleId": "phoneValidation.required",
       "field": "phone",
       "scope": "place",
       "createdAt": "2026-03-10T10:00:00Z",

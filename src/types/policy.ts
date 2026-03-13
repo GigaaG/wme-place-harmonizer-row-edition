@@ -1,13 +1,13 @@
 import type { GeometryPolicy, ServicePolicy } from "./chains";
-import type { AddressPolicy } from "./address";
+import type { AddressPolicy, PresenceRequirement } from "./address";
 
 export interface EffectivePlacePolicy {
   geometry?: GeometryPolicy;
   lockLevel?: number;
-  requirePhone?: boolean;
-  requireUrl?: boolean;
-  requireOpeningHours?: boolean;
-  requireExternalProvider?: boolean;
+  phone?: PresenceRequirement;
+  url?: PresenceRequirement;
+  openingHours?: PresenceRequirement;
+  externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;
 }

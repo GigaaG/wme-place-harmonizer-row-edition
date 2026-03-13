@@ -1,4 +1,4 @@
-import type { AddressPolicy } from "./address";
+import type { AddressPolicy, PresenceRequirement } from "./address";
 
 export type GeometryType = "point" | "polygon";
 
@@ -11,6 +11,7 @@ export interface GeometryPolicy {
 export interface ServicePolicy {
   required?: string[];
   recommended?: string[];
+  discouraged?: string[];
   forbidden?: string[];
 }
 
@@ -42,10 +43,10 @@ export interface ChainStandardDefinition {
 export interface ChainPolicyDefinition {
   geometry?: GeometryPolicy;
   lockLevel?: number;
-  requirePhone?: boolean;
-  requireUrl?: boolean;
-  requireOpeningHours?: boolean;
-  requireExternalProvider?: boolean;
+  phone?: PresenceRequirement;
+  url?: PresenceRequirement;
+  openingHours?: PresenceRequirement;
+  externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;
 }

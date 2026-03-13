@@ -1,13 +1,15 @@
-export type AddressFieldRequirement =
+export type PresenceRequirement =
   | "required"
   | "recommended"
   | "discouraged"
   | "forbidden";
 
+export type AddressFieldRequirement = PresenceRequirement;
+
 export interface AddressPolicy {
-  city?: AddressFieldRequirement;
-  street?: AddressFieldRequirement;
-  houseNumber?: AddressFieldRequirement;
+  city?: PresenceRequirement;
+  street?: PresenceRequirement;
+  houseNumber?: PresenceRequirement;
 }
 
 export interface PlaceAddress {

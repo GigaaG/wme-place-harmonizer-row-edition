@@ -1,6 +1,7 @@
 import { logger } from "../../logging/logger";
 import { getCurrentEditorLockLevel, getWmeSdk } from "./wme";
 import type { PlaceProposal } from "../../types/proposal";
+import { applyExternalProviderProposalInEditor } from "./external-provider-editor";
 
 interface ApplyResult {
   applied: number;
@@ -94,23 +95,21 @@ function buildUpdateArgs(
   return args;
 }
 
-export function applyVenueProposals(
+export async function applyVenueProposals(
   venueId: string,
   currentServices: string[],
   proposals: PlaceProposal[]
-): ApplyResult {
-  const sdk = getWmeSdk();
-
-  if (!sdk) {
-    return {
-      applied: 0,
-      skipped: proposals.length,
-      errors: ["WME SDK is not available"]
-    };
-  }
-
+): Promise<ApplyResult> {
   const supported = proposals.filter((proposal) => proposal.isApplySupported);
+  const sdkSupported = supported.filter(
+    (proposal) => proposal.field !== "externalProviderIds"
+  );
+  const editorSupported = supported.filter(
+    (proposal) => proposal.field === "externalProviderIds"
+  );
   const skipped = proposals.length - supported.length;
+  const errors: string[] = [];
+  let applied = 0;
 
   if (supported.length === 0) {
     return {
@@ -120,33 +119,49 @@ export function applyVenueProposals(
     };
   }
 
-  const editorLockLevel = getCurrentEditorLockLevel();
-  const args = buildUpdateArgs(
-    venueId,
-    currentServices,
-    supported,
-    editorLockLevel
-  );
+  if (sdkSupported.length > 0) {
+    const sdk = getWmeSdk();
 
-  try {
-    sdk.DataModel.Venues.updateVenue(args);
-    logger.info(`Applied ${supported.length} proposal(s) to venue ${venueId}`);
+    if (!sdk) {
+      errors.push("WME SDK is not available");
+    } else {
+      const editorLockLevel = getCurrentEditorLockLevel();
+      const args = buildUpdateArgs(
+        venueId,
+        currentServices,
+        sdkSupported,
+        editorLockLevel
+      );
 
-    return {
-      applied: supported.length,
-      skipped,
-      errors: []
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown apply error";
+      try {
+        sdk.DataModel.Venues.updateVenue(args);
+        applied += sdkSupported.length;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown apply error";
 
-    logger.error(`Failed to apply proposals: ${message}`);
-
-    return {
-      applied: 0,
-      skipped,
-      errors: [message]
-    };
+        logger.error(`Failed to apply SDK proposals: ${message}`);
+        errors.push(message);
+      }
+    }
   }
+
+  for (const proposal of editorSupported) {
+    const appliedInEditor = await applyExternalProviderProposalInEditor(proposal);
+
+    if (appliedInEditor) {
+      applied += 1;
+      continue;
+    }
+
+    errors.push("Could not select the suggested external provider in the editor");
+  }
+
+  logger.info(`Applied ${applied} proposal(s) to venue ${venueId}`);
+
+  return {
+    applied,
+    skipped,
+    errors
+  };
 }

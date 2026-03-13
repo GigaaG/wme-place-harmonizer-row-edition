@@ -113,6 +113,7 @@ Production builds continue to use `WMEPH-ROW:*`.
 ### Feature editor
 
 - selected venue analysis
+- top external provider suggestion for missing-provider issues, with Google Maps click-through
 - issue cards
 - lock level recommendation issues
 - suggestions / proposals
@@ -145,12 +146,12 @@ The MVP currently supports selective apply for a limited set of fields.
 - phone
 - url
 - services
+- external provider ids via WME editor autocomplete automation
 - opening hours
 
 ### Some fields are intentionally not automatically applied yet, such as
 
 - certain geometry transitions
-- external provider ids
 - fields requiring manual editor interaction
 
 ## Design principles

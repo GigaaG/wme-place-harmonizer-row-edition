@@ -48,6 +48,12 @@ import {
   resolveCountryCodeFromCountryEntity,
   resolveCountryCodeFromCountryId
 } from "../integration/sdk/venue-country";
+import type { PlaceIssue } from "../types/issue";
+import {
+  buildSuggestedExternalProviderIssueMessage,
+  buildExternalProviderSuggestionProposals,
+  findSuggestedExternalProviders
+} from "../integration/sdk/external-provider-suggestions";
 
 //
 // Runtime containers
@@ -58,6 +64,7 @@ let runtimeConfig: any | null = null;
 let runtimeChains: any | null = null;
 let runtimeSettings: any | null = null;
 let runtimeCountry: string | undefined;
+let externalProviderSuggestionRequestId = 0;
 
 //
 // Functions
@@ -291,6 +298,109 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function findMissingExternalProviderIssue(
+  issues: PlaceIssue[]
+): PlaceIssue | undefined {
+  return issues.find(
+    (issue) =>
+      issue.field === "externalProviderIds" &&
+      (issue.ruleId === "externalProvider.required" ||
+        issue.ruleId === "externalProvider.recommended")
+  );
+}
+
+function renderLatestVenueAnalysis(): void {
+  const latest = getLatestAnalysisState();
+
+  if (!latest?.isVenueSelection) {
+    return;
+  }
+
+  renderFeatureEditorAnalysis(
+    latest.placeName,
+    latest.chainId,
+    latest.issues,
+    latest.proposals,
+    latest.statusMessage
+  );
+  wireApplyButton();
+}
+
+function applyExternalProviderSuggestionToIssues(
+  issues: PlaceIssue[],
+  targetIssue: PlaceIssue,
+  suggestionMessage?: string
+): PlaceIssue[] {
+  return issues.map((issue) => {
+    if (
+      issue.field !== targetIssue.field ||
+      issue.ruleId !== targetIssue.ruleId
+    ) {
+      return issue;
+    }
+
+    return {
+      ...issue,
+      message: suggestionMessage ?? targetIssue.message
+    };
+  });
+}
+
+async function refreshExternalProviderSuggestions(params: {
+  requestId: number;
+  venue: any;
+  issue: PlaceIssue;
+  query: string;
+}): Promise<void> {
+  const suggestions = await findSuggestedExternalProviders(
+    params.venue,
+    params.query
+  );
+
+  if (params.requestId !== externalProviderSuggestionRequestId) {
+    return;
+  }
+
+  const latest = getLatestAnalysisState();
+
+  if (!latest?.isVenueSelection || latest.venueId !== String(params.venue.id)) {
+    return;
+  }
+
+  const retainedProposals = latest.proposals.filter(
+    (proposal) =>
+      !(
+        proposal.field === params.issue.field &&
+        proposal.issueRuleId === params.issue.ruleId
+      )
+  );
+  const suggestionProposals = buildExternalProviderSuggestionProposals(
+    params.issue,
+    suggestions,
+    latest.currentExternalProviderIds
+  );
+  const topSuggestion = suggestions[0];
+  const issuesWithSuggestion = applyExternalProviderSuggestionToIssues(
+    latest.issues,
+    params.issue,
+    buildSuggestedExternalProviderIssueMessage(params.issue, topSuggestion)
+  );
+
+  setLatestAnalysisState({
+    ...latest,
+    issues: issuesWithSuggestion,
+    proposals: [...retainedProposals, ...suggestionProposals]
+  });
+
+  logger.info(
+    suggestions.length > 0
+      ? `Found ${suggestions.length} external provider suggestion(s) for venue ${params.venue.id}`
+      : `No nearby external provider suggestions found for venue ${params.venue.id}`
+  );
+
+  renderLatestVenueAnalysis();
 }
 
 async function resolveStartupCountry(
@@ -541,8 +651,11 @@ function wireApplyButton(): void {
     }
 
     const selected = getSelectedProposals(latest.proposals);
+    const includesExternalProviderProposal = selected.some(
+      (proposal) => proposal.field === "externalProviderIds"
+    );
 
-    const result = applyVenueProposals(
+    const result = await applyVenueProposals(
       latest.venueId,
       latest.currentServices,
       selected
@@ -568,7 +681,9 @@ function wireApplyButton(): void {
       } else if (result.applied > 0) {
         statusMessage = {
           kind: "success" as const,
-          text: `Applied ${result.applied} fix(es), skipped ${result.skipped}`
+          text: includesExternalProviderProposal
+            ? `Applied ${result.applied} fix(es), skipped ${result.skipped}. External provider selection was sent through the editor autocomplete.`
+            : `Applied ${result.applied} fix(es), skipped ${result.skipped}`
         };
       } else {
         statusMessage = {
@@ -588,6 +703,10 @@ function wireApplyButton(): void {
     if (!sdk) {
       logger.warn("Cannot re-analyze after apply: SDK unavailable");
       return;
+    }
+
+    if (includesExternalProviderProposal) {
+      await wait(500);
     }
 
     const refreshedVenue = sdk.DataModel.Venues.getById({ venueId: latest.venueId });
@@ -700,12 +819,13 @@ async function analyzeVenue(params: {
   const previous = getLatestAnalysisState();
 
   setLatestAnalysisState({
-    venueId: venue.id,
+    venueId: String(venue.id),
     placeName: place.name,
     chainId: matchResult.chain?.id ?? null,
     issues,
     proposals,
     currentServices: place.services ?? [],
+    currentExternalProviderIds: place.externalProviderIds ?? [],
     isVenueSelection: true,
     statusMessage: previous?.statusMessage
   });
@@ -715,16 +835,18 @@ async function analyzeVenue(params: {
     return !!latest?.isVenueSelection;
   });
 
-  const latest = getLatestAnalysisState();
-  if (latest?.isVenueSelection) {
-    renderFeatureEditorAnalysis(
-      latest.placeName,
-      latest.chainId,
-      latest.issues,
-      latest.proposals,
-      latest.statusMessage
-    );
-    wireApplyButton();
+  renderLatestVenueAnalysis();
+
+  externalProviderSuggestionRequestId += 1;
+  const suggestionIssue = findMissingExternalProviderIssue(issues);
+
+  if (suggestionIssue) {
+    void refreshExternalProviderSuggestions({
+      requestId: externalProviderSuggestionRequestId,
+      venue,
+      issue: suggestionIssue,
+      query: place.name
+    });
   }
 }
 
@@ -829,14 +951,7 @@ export async function startApplication(): Promise<void> {
       return !!current?.isVenueSelection;
     });
 
-    renderFeatureEditorAnalysis(
-      latest.placeName,
-      latest.chainId,
-      latest.issues,
-      latest.proposals,
-      latest.statusMessage
-    );
-    wireApplyButton();
+    renderLatestVenueAnalysis();
   });
 
   onVenueSelected(
@@ -847,6 +962,7 @@ export async function startApplication(): Promise<void> {
     },
     async () => {
       logger.info("Selection is not a venue, hiding Place Harmonizer block");
+      externalProviderSuggestionRequestId += 1;
       clearLatestAnalysisState();
       const sidebarState = getSidebarDebugState();
       if (sidebarState) {

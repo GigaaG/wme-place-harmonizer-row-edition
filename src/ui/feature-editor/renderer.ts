@@ -2,17 +2,15 @@ import type { PlaceIssue } from "../../types/issue";
 import { ensureFeatureEditorContainer } from "./container";
 import type { PlaceProposal } from "../../types/proposal";
 
-function findProposalForIssue(
+function findProposalsForIssue(
   issue: PlaceIssue,
   proposals: PlaceProposal[]
-): PlaceProposal | undefined {
-
-  return proposals.find(
+): PlaceProposal[] {
+  return proposals.filter(
     (proposal) =>
       proposal.field === issue.field &&
       proposal.issueRuleId === issue.ruleId
   );
-
 }
 
 function getSeverityIcon(severity: string): string {
@@ -53,11 +51,127 @@ function formatDisplayValue(value: unknown): string {
   return escapeHtml(serialized ?? "missing");
 }
 
+function formatProposalValue(
+  value: unknown,
+  displayValue?: string
+): string {
+  if (typeof displayValue === "string" && displayValue.trim().length > 0) {
+    return escapeHtml(displayValue);
+  }
+
+  return formatDisplayValue(value);
+}
+
+function formatLinkedProposalValue(
+  value: unknown,
+  displayValue?: string,
+  valueUrl?: string
+): string {
+  const formattedValue = formatProposalValue(value, displayValue);
+
+  if (typeof valueUrl !== "string" || valueUrl.trim().length === 0) {
+    return formattedValue;
+  }
+
+  return `
+    <a
+      href="${escapeHtml(valueUrl)}"
+      target="_blank"
+      rel="noopener noreferrer"
+      style="color:#1a73e8;text-decoration:underline;"
+    >
+      ${formattedValue}
+    </a>
+  `;
+}
+
+function renderProposal(
+  issue: PlaceIssue,
+  proposal: PlaceProposal,
+  index: number
+): string {
+  let html = "";
+
+  html += `
+    <div style="
+      font-size:12px;
+      margin-top:6px;
+      ${index > 0 ? "padding-top:6px;border-top:1px solid #eee;" : ""}
+    ">
+  `;
+
+  if (
+    proposal.currentValue !== undefined ||
+    (proposal.displayCurrentValue ?? "").trim().length > 0
+  ) {
+    html += `
+      <div>
+        <b>Current:</b> ${formatProposalValue(
+          proposal.currentValue,
+          proposal.displayCurrentValue
+        )}
+      </div>
+    `;
+  }
+
+  if (
+    proposal.proposedValue !== undefined ||
+    (proposal.displayProposedValue ?? "").trim().length > 0
+  ) {
+    html += `
+      <div>
+        <b>Suggested:</b> ${formatLinkedProposalValue(
+          proposal.proposedValue,
+          proposal.displayProposedValue,
+          proposal.displayProposedValueUrl
+        )}
+      </div>
+    `;
+  }
+
+  if (proposal.reason && proposal.reason !== issue.message) {
+    html += `
+      <div style="color:#666;margin-top:4px;">
+        ${escapeHtml(proposal.reason)}
+      </div>
+    `;
+  }
+
+  if (proposal.isApplySupported) {
+    html += `
+      <label style="display:block;margin-top:6px;">
+        <input
+          type="checkbox"
+          class="wmeph-row-apply-checkbox"
+          data-field="${escapeHtml(proposal.field)}"
+          data-rule-id="${escapeHtml(proposal.issueRuleId ?? "")}"
+        />
+        Apply this fix
+      </label>
+    `;
+  } else {
+    const manualText =
+      proposal.actionType === "manual-only"
+        ? "Manual action required"
+        : "This suggestion is not applyable yet";
+
+    html += `
+      <div style="color:#888;margin-top:6px;">
+        ${escapeHtml(manualText)}
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+
+  return html;
+}
+
 function renderIssue(
   issue: PlaceIssue,
   proposals: PlaceProposal[]
 ): string {
-  const proposal = findProposalForIssue(issue, proposals);
+  const issueProposals = findProposalsForIssue(issue, proposals);
 
   let html = "";
 
@@ -85,51 +199,8 @@ function renderIssue(
     `;
   }
 
-  if (proposal) {
-    html += `
-      <div style="font-size:12px;margin-top:4px;">
-        <b>Current:</b> ${formatDisplayValue(proposal.currentValue)}
-      </div>
-    `;
-
-    html += `
-      <div style="font-size:12px;">
-        <b>Suggested:</b> ${formatDisplayValue(proposal.proposedValue)}
-      </div>
-    `;
-
-    if (proposal.reason && proposal.reason !== issue.message) {
-      html += `
-        <div style="font-size:12px;color:#666;margin-top:4px;">
-          ${escapeHtml(proposal.reason)}
-        </div>
-      `;
-    }
-
-    if (proposal.isApplySupported) {
-      html += `
-        <label style="display:block;margin-top:6px;font-size:12px;">
-          <input
-            type="checkbox"
-            class="wmeph-row-apply-checkbox"
-            data-field="${escapeHtml(proposal.field)}"
-            data-rule-id="${escapeHtml(proposal.issueRuleId ?? "")}"
-          />
-          Apply this fix
-        </label>
-      `;
-    } else {
-      const manualText =
-        proposal.actionType === "manual-only"
-          ? "Manual action required"
-          : "This suggestion is not applyable yet";
-
-      html += `
-        <div style="font-size:12px;color:#888;margin-top:6px;">
-          ${escapeHtml(manualText)}
-        </div>
-      `;
-    }
+  for (let index = 0; index < issueProposals.length; index += 1) {
+    html += renderProposal(issue, issueProposals[index], index);
   }
 
   html += `</div>`;

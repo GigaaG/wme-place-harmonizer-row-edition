@@ -390,26 +390,35 @@ export function evaluatePlace(
   }
 
   const expectedOpeningHours = chain?.standard?.openingHoursTemplate;
-  if (
-    expectedOpeningHours &&
-    place.openingHours &&
-    place.openingHours.length > 0
-  ) {
+  if (expectedOpeningHours && expectedOpeningHours.length > 0) {
     const normalizeHours = (hours: typeof expectedOpeningHours) =>
       hours.map((entry) => JSON.stringify(entry)).sort();
 
-    const current = normalizeHours(place.openingHours);
-    const expected = normalizeHours(expectedOpeningHours);
+    const currentOpeningHours = place.openingHours ?? [];
 
-    if (!arraysEqual(current, expected)) {
+    if (currentOpeningHours.length === 0) {
       issues.push({
         field: "openingHours",
         severity: "warning",
-        message: "Opening hours differ from the chain template",
-        currentValue: place.openingHours,
+        message: "Opening hours are missing but the chain provides a template",
+        currentValue: currentOpeningHours,
         expectedValue: expectedOpeningHours,
         ruleId: "openingHours.template"
       });
+    } else {
+      const current = normalizeHours(currentOpeningHours);
+      const expected = normalizeHours(expectedOpeningHours);
+
+      if (!arraysEqual(current, expected)) {
+        issues.push({
+          field: "openingHours",
+          severity: "warning",
+          message: "Opening hours differ from the chain template",
+          currentValue: currentOpeningHours,
+          expectedValue: expectedOpeningHours,
+          ruleId: "openingHours.template"
+        });
+      }
     }
   }
 

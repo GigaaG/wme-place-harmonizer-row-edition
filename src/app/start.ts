@@ -311,6 +311,20 @@ function findMissingExternalProviderIssue(
   );
 }
 
+function formatAnalysisCountLabel(issues: PlaceIssue[]): string {
+  const findingsLabel = `${issues.length} finding(s)`;
+  const warningOrErrorCount = issues.filter(
+    (issue) => issue.severity === "warning" || issue.severity === "error"
+  ).length;
+
+  if (warningOrErrorCount === issues.length) {
+    return findingsLabel;
+  }
+
+  const infoCount = issues.length - warningOrErrorCount;
+  return `${findingsLabel}, including ${infoCount} info`;
+}
+
 function renderLatestVenueAnalysis(): void {
   const latest = getLatestAnalysisState();
 
@@ -809,7 +823,7 @@ async function analyzeVenue(params: {
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
       runtimeChainsCount: runtimeChains.items.length,
-      lastStatus: `Analyzed venue: ${place.name} (${issues.length} issue(s))`
+      lastStatus: `Analyzed venue: ${place.name} (${formatAnalysisCountLabel(issues)})`
     });
 
     const updatedSidebarState = getSidebarDebugState();

@@ -27,6 +27,34 @@ function getSeverityLabel(severity: string): string {
   return "Info";
 }
 
+function getSeverityColors(severity: string): {
+  border: string;
+  background: string;
+  text: string;
+} {
+  if (severity === "error") {
+    return {
+      border: "#d32f2f",
+      background: "#fff5f5",
+      text: "#8b1e1e"
+    };
+  }
+
+  if (severity === "warning") {
+    return {
+      border: "#f9a825",
+      background: "#fff8e1",
+      text: "#8a5a00"
+    };
+  }
+
+  return {
+    border: "#1e88e5",
+    background: "#f1f8ff",
+    text: "#0b5394"
+  };
+}
+
 function escapeHtml(value: unknown): string {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -161,20 +189,21 @@ function renderIssue(
   proposals: PlaceProposal[]
 ): string {
   let html = "";
+  const colors = getSeverityColors(issue.severity);
 
   html += `
     <div style="
-      border: 1px solid #ddd;
+      border: 1px solid ${colors.border};
       border-radius: 4px;
       padding: 8px;
       margin-top: 8px;
-      background: #fff;
+      background: ${colors.background};
     ">
   `;
 
   html += `
-    <div style="font-weight:600; margin-bottom:4px;">
-      ${getSeverityIcon(issue.severity)} ${escapeHtml(issue.message)}
+    <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
+      ${getSeverityIcon(issue.severity)} ${escapeHtml(getSeverityLabel(issue.severity))}: ${escapeHtml(issue.message)}
     </div>
   `;
 
@@ -270,7 +299,7 @@ export function renderFeatureEditorAnalysis(
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Issues</b></div>
+      <div><b>Findings</b></div>
       <div>${issueGroups.length}</div>
     </div>
   `;
@@ -284,7 +313,7 @@ export function renderFeatureEditorAnalysis(
         background: #fff;
         color: green;
       ">
-        No issues found
+        No findings
       </div>
     `;
   } else {

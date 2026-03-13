@@ -71,6 +71,7 @@ export interface ChainRecord {
   policy?: ChainPolicyDefinition;
   scope?: ChainScopeDefinition;
   meta?: ChainMetaDefinition;
+  editorNotes?: string[];
 }
 
 export interface ChainDataset {

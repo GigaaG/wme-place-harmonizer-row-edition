@@ -58,6 +58,7 @@ export interface CategoryStandard {
   externalProviderIds?: PresenceRequirement;
   services?: ServiceStandard;
   address?: AddressPolicy;
+  editorNotes?: string[];
 }
 
 export interface HarmonizerConfig {

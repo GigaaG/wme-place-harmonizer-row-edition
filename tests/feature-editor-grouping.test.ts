@@ -92,3 +92,20 @@ runTest("uses the highest severity inside a grouped alias card", () => {
   assert.equal(groups[0].severity, "warning");
   assert.equal(groups[0].message, "Suggested aliases missing");
 });
+
+runTest("keeps informational cards informational when no stronger severity exists", () => {
+  const issues: PlaceIssue[] = [
+    {
+      field: "",
+      severity: "info",
+      message: "Bus stops are not considered bus stations in the Netherlands.",
+      ruleId: "editorNote.category.1"
+    }
+  ];
+
+  const groups = groupIssuesForFeatureEditor(issues, []);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].severity, "info");
+  assert.equal(groups[0].message, "Bus stops are not considered bus stations in the Netherlands.");
+});

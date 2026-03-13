@@ -50,6 +50,20 @@ function normalizeAliases(aliases: string[] | undefined): string[] {
   );
 }
 
+function normalizeEditorNotes(notes: string[] | undefined): string[] {
+  if (!Array.isArray(notes)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      notes
+        .map((note) => (typeof note === "string" ? normalizeWhitespace(note) : ""))
+        .filter((note) => note.length > 0)
+    )
+  );
+}
+
 const ADDRESS_FIELD_METADATA: Array<{
   key: keyof AddressPolicy;
   label: string;
@@ -197,6 +211,8 @@ export function evaluatePlace(
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
   const aliases = normalizeAliases(place.aliases);
+  const categoryEditorNotes = normalizeEditorNotes(policy.editorNotes);
+  const chainEditorNotes = normalizeEditorNotes(chain?.editorNotes);
   const externalProviderIds = normalizeExternalProviderIds(
     place.externalProviderIds
   );
@@ -205,6 +221,21 @@ export function evaluatePlace(
   const isCityInVenueNameEnabled =
     policy.cityInVenueName ?? cityInVenueNameRule?.enabled ?? false;
   const cityInVenueNameSeverity = cityInVenueNameRule?.severity ?? "warning";
+  const seenEditorNotes = new Set<string>();
+
+  const pushEditorNote = (message: string, ruleId: string): void => {
+    if (seenEditorNotes.has(message)) {
+      return;
+    }
+
+    seenEditorNotes.add(message);
+    issues.push({
+      field: "",
+      severity: "info",
+      message,
+      ruleId
+    });
+  };
 
   //
   // NAME
@@ -605,6 +636,14 @@ export function evaluatePlace(
         }
       }
     }
+  }
+
+  for (let index = 0; index < categoryEditorNotes.length; index += 1) {
+    pushEditorNote(categoryEditorNotes[index], `editorNote.category.${index + 1}`);
+  }
+
+  for (let index = 0; index < chainEditorNotes.length; index += 1) {
+    pushEditorNote(chainEditorNotes[index], `editorNote.chain.${index + 1}`);
   }
 
   return issues;

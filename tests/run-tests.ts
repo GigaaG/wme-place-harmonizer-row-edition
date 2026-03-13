@@ -4,6 +4,7 @@ import "./evaluate-place.url-format.test.ts";
 import "./evaluate-place.opening-hours.test.ts";
 import "./category-standards.test.ts";
 import "./evaluate-place.aliases.test.ts";
+import "./evaluate-place.editor-notes.test.ts";
 import "./external-provider-suggestions.test.ts";
 import "./external-provider-editor.test.ts";
 import "./feature-editor-grouping.test.ts";

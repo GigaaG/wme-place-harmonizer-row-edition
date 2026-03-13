@@ -17,6 +17,11 @@ const runtimeConfig: HarmonizerConfig = {
         allowed: ["point", "polygon"]
       },
       lockLevel: 2
+    },
+    BUS_STATION: {
+      editorNotes: [
+        "In the Netherlands, bus stops are not considered bus stations."
+      ]
     }
   }
 };
@@ -61,4 +66,30 @@ runTest("applies Forest standards when sdk category objects include numeric ids"
     issues.map((issue) => issue.ruleId),
     ["geometry.recommended", "lockLevelRecommendation"]
   );
+});
+
+runTest("emits informational editor notes from matched category standards", () => {
+  const rawCategories = ["BUS_STATION"];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => runtimeConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const place: PlaceLike = {
+    name: "Test Bus Station",
+    categories: normalizedCategories
+  };
+
+  const issues = evaluatePlace(
+    place,
+    resolveEffectivePolicy({ categoryStandards })
+  );
+
+  assert.deepEqual(issues, [
+    {
+      field: "",
+      severity: "info",
+      message: "In the Netherlands, bus stops are not considered bus stations.",
+      ruleId: "editorNote.category.1"
+    }
+  ]);
 });

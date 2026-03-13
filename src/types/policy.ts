@@ -11,4 +11,5 @@ export interface EffectivePlacePolicy {
   externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;
+  editorNotes?: string[];
 }

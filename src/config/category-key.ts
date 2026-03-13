@@ -1,13 +1,16 @@
-const CATEGORY_FIELD_CANDIDATES = [
-  "id",
-  "categoryId",
-  "categoryID",
-  "code",
+const DESCRIPTIVE_CATEGORY_FIELD_CANDIDATES = [
+  "category",
+  "name",
   "key",
   "slug",
   "value",
-  "name",
-  "category"
+  "code"
+];
+
+const IDENTIFIER_CATEGORY_FIELD_CANDIDATES = [
+  "categoryId",
+  "categoryID",
+  "id"
 ];
 
 function normalizeCategoryString(value: string): string | undefined {
@@ -22,6 +25,20 @@ function normalizeCategoryString(value: string): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function readFirstCategoryField(
+  record: Record<string, unknown>,
+  fields: readonly string[]
+): string | undefined {
+  for (const field of fields) {
+    const value = record[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function extractCategoryString(category: unknown): string | undefined {
   if (typeof category === "string") {
     return category;
@@ -32,19 +49,23 @@ function extractCategoryString(category: unknown): string | undefined {
   }
 
   const record = category as Record<string, unknown>;
+  const descriptiveValue = readFirstCategoryField(
+    record,
+    DESCRIPTIVE_CATEGORY_FIELD_CANDIDATES
+  );
 
-  for (const field of CATEGORY_FIELD_CANDIDATES) {
-    const value = record[field];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
+  if (descriptiveValue) {
+    return descriptiveValue;
   }
 
   if (record.attributes && typeof record.attributes === "object") {
-    return extractCategoryString(record.attributes);
+    const nestedValue = extractCategoryString(record.attributes);
+    if (nestedValue) {
+      return nestedValue;
+    }
   }
 
-  return undefined;
+  return readFirstCategoryField(record, IDENTIFIER_CATEGORY_FIELD_CANDIDATES);
 }
 
 export function normalizeCategoryKey(category: unknown): string | undefined {

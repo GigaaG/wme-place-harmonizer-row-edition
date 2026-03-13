@@ -24,8 +24,15 @@ export interface PhoneFormattingConfig {
   validationMessage?: string;
 }
 
+export interface UrlFormattingConfig {
+  validationPatterns?: string[];
+  validationExamples?: string[];
+  validationMessage?: string;
+}
+
 export interface FormattingConfig {
   phone?: PhoneFormattingConfig;
+  url?: UrlFormattingConfig;
 }
 
 export interface GeometryStandard {

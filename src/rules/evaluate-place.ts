@@ -3,8 +3,12 @@ import type { EffectivePlacePolicy } from "../types/policy";
 import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
 import type { AddressPolicy, PresenceRequirement } from "../types/address";
-import type { PhoneFormattingConfig } from "../types/config";
+import type {
+  PhoneFormattingConfig,
+  UrlFormattingConfig
+} from "../types/config";
 import { buildPhoneFormatIssue } from "./phone-format.ts";
+import { buildUrlFormatIssue } from "./url-format.ts";
 
 function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   if (a.length !== b.length) {
@@ -132,6 +136,7 @@ export function evaluatePlace(
   chain?: ChainRecord,
   options?: {
     phoneFormatting?: PhoneFormattingConfig;
+    urlFormatting?: UrlFormattingConfig;
   }
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
@@ -254,6 +259,14 @@ export function evaluatePlace(
         forbidden: "URL must not be provided"
       }
     });
+
+    if (issue) {
+      issues.push(issue);
+    }
+  }
+
+  if (hasText(place.url)) {
+    const issue = buildUrlFormatIssue(place.url, options?.urlFormatting);
 
     if (issue) {
       issues.push(issue);

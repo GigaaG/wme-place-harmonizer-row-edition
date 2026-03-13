@@ -655,7 +655,8 @@ async function analyzeVenue(params: {
   );
 
   const issues = evaluatePlace(place, effectivePolicy, matchResult.chain, {
-    phoneFormatting: runtimeConfig.formatting?.phone
+    phoneFormatting: runtimeConfig.formatting?.phone,
+    urlFormatting: runtimeConfig.formatting?.url
   });
   const editorLockLevel = getCurrentEditorLockLevel();
   const proposals = generateProposals(issues, { editorLockLevel });

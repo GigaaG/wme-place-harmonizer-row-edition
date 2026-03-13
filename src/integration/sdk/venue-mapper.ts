@@ -2,6 +2,7 @@ import type { PlaceLike, GeometryType, OpeningHourDefinition } from "../../types
 import type { PlaceAddress } from "../../types/address";
 import { normalizeCategoryKeys } from "../../config/category-key";
 import { resolveVenueCountryCode } from "./venue-country";
+import { getWmeSdk } from "./wme";
 
 function mapGeometry(geometry: any): GeometryType | undefined {
   if (geometry?.type === "Point" || geometry?.type === "point") {
@@ -122,9 +123,35 @@ function mapCategories(venue: any): string[] {
   ]);
 }
 
+function getVenueAddressFromSdk(venue: any): any | undefined {
+  const sdk = getWmeSdk();
+  const venueId = venue?.id ?? venue?.attributes?.id;
+
+  if (!sdk || venueId === undefined || venueId === null) {
+    return undefined;
+  }
+
+  try {
+    return sdk.DataModel?.Venues?.getAddress?.({ venueId });
+  } catch {
+    // Fall through to compatibility fallback.
+  }
+
+  try {
+    return sdk.DataModel?.Venues?.getAddress?.(venueId);
+  } catch {
+    return undefined;
+  }
+}
+
 function mapAddress(venue: any): PlaceAddress | undefined {
+  const sdkAddress = getVenueAddressFromSdk(venue);
+
   const address = {
     city: firstString(
+      sdkAddress?.city?.name,
+      sdkAddress?.cityName,
+      sdkAddress?.city,
       venue?.address?.city?.name,
       venue?.address?.cityName,
       venue?.address?.city,
@@ -137,6 +164,10 @@ function mapAddress(venue: any): PlaceAddress | undefined {
       venue?.attributes?.city
     ),
     street: firstString(
+      sdkAddress?.street?.name,
+      sdkAddress?.street?.englishName,
+      sdkAddress?.streetName,
+      sdkAddress?.street,
       venue?.address?.street?.name,
       venue?.address?.streetName,
       venue?.address?.street,
@@ -149,6 +180,9 @@ function mapAddress(venue: any): PlaceAddress | undefined {
       venue?.attributes?.street
     ),
     houseNumber: firstString(
+      sdkAddress?.houseNumber,
+      sdkAddress?.house_number,
+      sdkAddress?.housenumber,
       venue?.address?.houseNumber,
       venue?.address?.housenumber,
       venue?.address?.house_number,

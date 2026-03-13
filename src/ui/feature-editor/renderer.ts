@@ -48,6 +48,11 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
+function formatDisplayValue(value: unknown): string {
+  const serialized = JSON.stringify(value);
+  return escapeHtml(serialized ?? "missing");
+}
+
 function renderIssue(
   issue: PlaceIssue,
   proposals: PlaceProposal[]
@@ -83,13 +88,13 @@ function renderIssue(
   if (proposal) {
     html += `
       <div style="font-size:12px;margin-top:4px;">
-        <b>Current:</b> ${escapeHtml(JSON.stringify(proposal.currentValue))}
+        <b>Current:</b> ${formatDisplayValue(proposal.currentValue)}
       </div>
     `;
 
     html += `
       <div style="font-size:12px;">
-        <b>Suggested:</b> ${escapeHtml(JSON.stringify(proposal.proposedValue))}
+        <b>Suggested:</b> ${formatDisplayValue(proposal.proposedValue)}
       </div>
     `;
 

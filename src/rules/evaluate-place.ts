@@ -14,12 +14,30 @@ function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   return left.every((value, index) => value === right[index]);
 }
 
+function normalizeExternalProviderIds(ids: string[] | undefined): string[] {
+  if (!Array.isArray(ids)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      ids
+        .map((id) => String(id).trim())
+        .filter((id) => id.length > 0)
+    )
+  );
+}
+
 export function evaluatePlace(
   place: PlaceLike,
   policy: EffectivePlacePolicy,
   chain?: ChainRecord
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
+  const externalProviderIds = normalizeExternalProviderIds(
+    place.externalProviderIds
+  );
+  const hasExternalProviders = externalProviderIds.length > 0;
 
   //
   // NAME
@@ -170,31 +188,41 @@ export function evaluatePlace(
   // EXTERNAL PROVIDER IDS
   //
 
-  if (policy.requireExternalProvider) {
-    if (!place.externalProviderIds || place.externalProviderIds.length === 0) {
-      issues.push({
-        field: "externalProviderIds",
-        severity: "error",
-        message: "At least one external provider id is required",
-        ruleId: "externalProvider.required"
-      });
-    }
+  if (policy.requireExternalProvider === true && !hasExternalProviders) {
+    issues.push({
+      field: "externalProviderIds",
+      severity: "error",
+      message: "At least one external provider id is required",
+      currentValue: externalProviderIds,
+      ruleId: "externalProvider.required"
+    });
+  }
+
+  if (policy.requireExternalProvider === false && hasExternalProviders) {
+    issues.push({
+      field: "externalProviderIds",
+      severity: "error",
+      message: "Venue should not have external providers",
+      currentValue: externalProviderIds,
+      expectedValue: [],
+      ruleId: "externalProvider.forbidden"
+    });
   }
 
   const expectedExternalProviderIds = chain?.standard?.externalProviderIds;
   if (
     expectedExternalProviderIds &&
-    expectedExternalProviderIds.length > 0 &&
-    (!place.externalProviderIds ||
-      !expectedExternalProviderIds.every((id) =>
-        place.externalProviderIds?.includes(id)
-      ))
+    (expectedExternalProviderIds.length === 0
+      ? hasExternalProviders
+      : !expectedExternalProviderIds.every((id) =>
+          externalProviderIds.includes(id)
+        ))
   ) {
     issues.push({
       field: "externalProviderIds",
       severity: "warning",
       message: "External provider ids differ from the chain standard",
-      currentValue: place.externalProviderIds,
+      currentValue: externalProviderIds,
       expectedValue: expectedExternalProviderIds,
       ruleId: "externalProvider.match"
     });

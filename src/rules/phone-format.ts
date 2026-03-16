@@ -31,8 +31,23 @@ const DUTCH_TWO_DIGIT_AREA_CODES = new Set([
   "76",
   "77",
   "78",
-  "79"
+  "79",
+  "88"
 ]);
+
+function isSupportedDutchNationalNumber(nationalDigits: string): boolean {
+  if (!/^\d{9}$/.test(nationalDigits)) {
+    return false;
+  }
+
+  const twoDigitPrefix = nationalDigits.slice(0, 2);
+
+  if (DUTCH_TWO_DIGIT_AREA_CODES.has(twoDigitPrefix)) {
+    return true;
+  }
+
+  return /^[1-57]\d{8}$/.test(nationalDigits);
+}
 
 function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -122,7 +137,7 @@ function formatDutchNationalNumber(nationalDigits: string): string | undefined {
     return `+31 6 ${nationalDigits.slice(1)}`;
   }
 
-  if (nationalDigits.length !== 9 || !/^[1-57]\d{8}$/.test(nationalDigits)) {
+  if (!isSupportedDutchNationalNumber(nationalDigits)) {
     return undefined;
   }
 

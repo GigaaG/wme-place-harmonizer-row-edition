@@ -11,7 +11,7 @@ const dutchPhoneFormatting: PhoneFormattingConfig = {
   countryCode: "+31",
   formatStyle: "international",
   validationPatterns: [
-    "^\\+31 [1-57]\\d \\d{7}$",
+    "^\\+31 (?:[1-57]\\d|88) \\d{7}$",
     "^\\+31 [1-57]\\d{2} \\d{6}$",
     "^\\+31 6 \\d{8}$",
     "^\\+(?!31)\\d{1,3}(?: \\d{1,14})+$",
@@ -60,6 +60,7 @@ runTest("accepts Dutch international and service-number formats", () => {
   const validPhones = [
     "+31 20 1234567",
     "+31 113 123456",
+    "+31 88 0708090",
     "+31 6 12345678",
     "+32 3 123 45 67",
     "+44 20 7946 0018",
@@ -121,6 +122,10 @@ runTest("normalizes service and international separator variants when possible",
   assert.equal(
     getPhoneFormatIssue("+31 (0)20 123 4567")?.expectedValue,
     "+31 20 1234567"
+  );
+  assert.equal(
+    getPhoneFormatIssue("+3188 070 8090")?.expectedValue,
+    "+31 88 0708090"
   );
   assert.equal(
     getPhoneFormatIssue("0032-3-123-45-67")?.expectedValue,

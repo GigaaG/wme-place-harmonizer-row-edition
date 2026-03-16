@@ -53,6 +53,16 @@ function stripProtocol(url: string): string | undefined {
   return normalized;
 }
 
+function addHttpsProtocol(url: string): string | undefined {
+  const trimmed = url.trim();
+
+  if (trimmed.length === 0 || /^[A-Za-z][A-Za-z\d+\-.]*:\/\//.test(trimmed)) {
+    return undefined;
+  }
+
+  return `https://${trimmed}`;
+}
+
 export function suggestUrlFormat(
   url: string,
   formatting?: UrlFormattingConfig
@@ -62,7 +72,7 @@ export function suggestUrlFormat(
   }
 
   const trimmedUrl = url.trim();
-  const suggestions = [stripProtocol(trimmedUrl)];
+  const suggestions = [stripProtocol(trimmedUrl), addHttpsProtocol(trimmedUrl)];
 
   for (const suggestion of suggestions) {
     if (!hasText(suggestion) || suggestion === trimmedUrl) {

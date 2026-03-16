@@ -9,16 +9,16 @@ import type { PlaceIssue } from "../src/types/issue.ts";
 
 const dutchUrlFormatting: UrlFormattingConfig = {
   validationPatterns: [
-    "^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}(?::\\d{1,5})?(?:[/?#][^\\s]*)?$"
+    "^https?:\\/\\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+[A-Za-z]{2,63}(?::\\d{1,5})?(?:[/?#][^\\s]*)?$"
   ],
   validationExamples: [
-    "www.casca.nl",
-    "tickets.example.nl",
-    "example.com/en",
-    "info.example.co.uk?lang=en"
+    "https://www.casca.nl",
+    "https://tickets.example.nl",
+    "https://example.com/en",
+    "https://info.example.co.uk?lang=en"
   ],
   validationMessage:
-    "URL must omit http:// or https:// and use only the hostname, optionally with a port, path, query or fragment"
+    "URL must include http:// or https:// and use a valid hostname, optionally with a port, path, query or fragment"
 };
 
 function buildPlace(url?: string): PlaceLike {
@@ -55,14 +55,14 @@ function runTest(name: string, fn: () => void): void {
   }
 }
 
-runTest("accepts hostname-only URLs with or without subdomains", () => {
+runTest("accepts protocol-prefixed URLs with or without subdomains", () => {
   const validUrls = [
-    "www.casca.nl",
-    "tickets.example.nl",
-    "example.com",
-    "example.com/en",
-    "shop.example.co.uk?lang=en",
-    "sub.example.org#contact"
+    "https://www.casca.nl",
+    "http://tickets.example.nl",
+    "https://example.com",
+    "https://example.com/en",
+    "https://shop.example.co.uk?lang=en",
+    "https://sub.example.org#contact"
   ];
 
   for (const url of validUrls) {
@@ -70,10 +70,10 @@ runTest("accepts hostname-only URLs with or without subdomains", () => {
   }
 });
 
-runTest("reports protocol-prefixed and malformed URLs", () => {
+runTest("reports protocol-less and malformed URLs", () => {
   const invalidUrls = [
-    "https://www.casca.nl",
-    "HTTP://tickets.example.nl/en",
+    "www.casca.nl",
+    "tickets.example.nl/en",
     "ftp://example.com",
     "www example nl",
     "example"
@@ -92,21 +92,26 @@ runTest("keeps presence and format validation independent", () => {
 
   assert.deepEqual(
     getUrlIssueRuleIds("https://www.casca.nl", { url: "forbidden" }),
+    ["urlValidation.forbidden"]
+  );
+
+  assert.deepEqual(
+    getUrlIssueRuleIds("www.casca.nl", { url: "forbidden" }),
     ["urlValidation.forbidden", "urlValidation.format"]
   );
 });
 
-runTest("creates applyable URL-format proposals when protocol stripping fixes it", () => {
-  const issue = getUrlFormatIssue("https://tickets.example.nl/en");
+runTest("creates applyable URL-format proposals when adding https fixes it", () => {
+  const issue = getUrlFormatIssue("tickets.example.nl/en");
 
   assert.ok(issue);
-  assert.equal(issue.expectedValue, "tickets.example.nl/en");
+  assert.equal(issue.expectedValue, "https://tickets.example.nl/en");
 
   const proposals = generateProposals([issue]);
 
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].field, "url");
-  assert.equal(proposals[0].proposedValue, "tickets.example.nl/en");
+  assert.equal(proposals[0].proposedValue, "https://tickets.example.nl/en");
   assert.equal(proposals[0].issueRuleId, "urlValidation.format");
   assert.equal(proposals[0].isApplySupported, true);
   assert.equal(proposals[0].actionType, "set-field");

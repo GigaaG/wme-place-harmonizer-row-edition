@@ -269,6 +269,30 @@ runTest("leaf subcategories inherit missing fields from their main category", ()
   );
 });
 
+runTest("required child geometry suppresses inherited parent geometry recommendation", () => {
+  const rawCategories = ["GAS_STATION"];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = resolveCategoryStandards(nlConfig, normalizedCategories);
+  const place: PlaceLike = {
+    name: "Test Gas Station",
+    categories: normalizedCategories,
+    geometry: "polygon"
+  };
+  const policy = resolveEffectivePolicy({ categoryStandards });
+  const issues = evaluatePlace(place, policy);
+
+  assert.equal(policy.geometry?.required, "polygon");
+  assert.equal(policy.geometry?.recommended, "point");
+  assert.equal(
+    issues.some((issue) => issue.ruleId === "geometry.recommended"),
+    false
+  );
+  assert.equal(
+    issues.some((issue) => issue.ruleId === "geometry.required"),
+    false
+  );
+});
+
 runTest("subcategory overrides main category for NL transport external provider rules", () => {
   const rawCategories = [
     {

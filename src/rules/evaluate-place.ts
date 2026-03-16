@@ -277,15 +277,17 @@ export function evaluatePlace(
   //
 
   if (policy.geometry && place.geometry) {
-    if (policy.geometry.required && place.geometry !== policy.geometry.required) {
-      issues.push({
-        field: "geometry",
-        severity: "error",
-        message: `Geometry must be ${policy.geometry.required}`,
-        currentValue: place.geometry,
-        expectedValue: policy.geometry.required,
-        ruleId: "geometry.required"
-      });
+    if (policy.geometry.required) {
+      if (place.geometry !== policy.geometry.required) {
+        issues.push({
+          field: "geometry",
+          severity: "error",
+          message: `Geometry must be ${policy.geometry.required}`,
+          currentValue: place.geometry,
+          expectedValue: policy.geometry.required,
+          ruleId: "geometry.required"
+        });
+      }
     } else if (
       policy.geometry.recommended &&
       place.geometry !== policy.geometry.recommended

@@ -10,4 +10,5 @@ import "./external-provider-suggestions.test.ts";
 import "./external-provider-editor.test.ts";
 import "./feature-editor-grouping.test.ts";
 import "./venue-updater.geometry.test.ts";
+import "./venue-save-scan.test.ts";
 import "./whitelist-manager.test.ts";

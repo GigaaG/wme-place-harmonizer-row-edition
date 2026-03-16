@@ -42,6 +42,7 @@ import { scanVisibleVenues } from "./scan-visible-venues";
 import { wireSidebarScanButton } from "../ui/sidebar/actions";
 import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";
 import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
+import { registerVenueSaveScanListener } from "../integration/sdk/venue-save-scan";
 import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
 import { normalizeCountryCode } from "../config/country-code";
 import { DATA_REPOSITORY_BRANCH } from "../config/source";
@@ -1130,6 +1131,7 @@ export async function startApplication(): Promise<void> {
     () => !!runtimeSettings?.autoScanVisibleVenues,
     () => scanVisibleVenuesFromMap("auto")
   );
+  registerVenueSaveScanListener(() => scanVisibleVenuesFromMap("manual"));
 
   logger.info("Registering selected venue analysis flow");
 

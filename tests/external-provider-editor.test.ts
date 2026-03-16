@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   chooseExternalProviderEditorCandidate,
+  dismissExternalProviderAutocompleteInput,
   resolveInputValueSetter
 } from "../src/integration/sdk/external-provider-editor.ts";
 
@@ -116,4 +117,81 @@ runTest("resolves the input value setter from the input owner window realm", () 
   assert.ok(setter);
   setter?.("Albert Heijn");
   assert.equal(assignedValue, "owner:Albert Heijn");
+});
+
+runTest("dismisses the autocomplete input with escape and blur", () => {
+  const dispatchedEvents: Array<{
+    type: string;
+    key?: string;
+    code?: string;
+    bubbles?: boolean;
+    composed?: boolean;
+  }> = [];
+  let blurCount = 0;
+
+  class FakeKeyboardEvent {
+    type: string;
+    key?: string;
+    code?: string;
+    bubbles?: boolean;
+    composed?: boolean;
+
+    constructor(
+      type: string,
+      init: {
+        key?: string;
+        code?: string;
+        bubbles?: boolean;
+        composed?: boolean;
+      }
+    ) {
+      this.type = type;
+      this.key = init.key;
+      this.code = init.code;
+      this.bubbles = init.bubbles;
+      this.composed = init.composed;
+    }
+  }
+
+  const fakeInput = {
+    ownerDocument: {
+      defaultView: {
+        KeyboardEvent: FakeKeyboardEvent
+      }
+    },
+    dispatchEvent(event: FakeKeyboardEvent) {
+      dispatchedEvents.push({
+        type: event.type,
+        key: event.key,
+        code: event.code,
+        bubbles: event.bubbles,
+        composed: event.composed
+      });
+
+      return true;
+    },
+    blur() {
+      blurCount += 1;
+    }
+  };
+
+  dismissExternalProviderAutocompleteInput(fakeInput);
+
+  assert.deepEqual(dispatchedEvents, [
+    {
+      type: "keydown",
+      key: "Escape",
+      code: "Escape",
+      bubbles: true,
+      composed: true
+    },
+    {
+      type: "keyup",
+      key: "Escape",
+      code: "Escape",
+      bubbles: true,
+      composed: true
+    }
+  ]);
+  assert.equal(blurCount, 1);
 });

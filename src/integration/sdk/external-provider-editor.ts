@@ -112,6 +112,38 @@ export function resolveInputValueSetter(
   return undefined;
 }
 
+export function dismissExternalProviderAutocompleteInput(
+  input: Pick<HTMLInputElement, "ownerDocument" | "dispatchEvent"> & {
+    blur?: () => void;
+  }
+): void {
+  const ownerWindow = input.ownerDocument?.defaultView;
+  const KeyboardEventCtor =
+    ownerWindow?.KeyboardEvent ??
+    (typeof KeyboardEvent !== "undefined" ? KeyboardEvent : undefined);
+
+  if (KeyboardEventCtor) {
+    input.dispatchEvent(
+      new KeyboardEventCtor("keydown", {
+        key: "Escape",
+        code: "Escape",
+        bubbles: true,
+        composed: true
+      })
+    );
+    input.dispatchEvent(
+      new KeyboardEventCtor("keyup", {
+        key: "Escape",
+        code: "Escape",
+        bubbles: true,
+        composed: true
+      })
+    );
+  }
+
+  input.blur?.();
+}
+
 function setInputValue(input: HTMLInputElement, value: string): void {
   const valueSetter = resolveInputValueSetter(input);
   const ownerWindow = input.ownerDocument?.defaultView;
@@ -125,6 +157,14 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   const InputEventCtor = ownerWindow?.Event ?? Event;
   input.dispatchEvent(new InputEventCtor("input", { bubbles: true }));
   input.dispatchEvent(new InputEventCtor("change", { bubbles: true }));
+}
+
+function dismissExternalProviderAutocomplete(): void {
+  const input = findExternalProviderInput();
+
+  if (input) {
+    dismissExternalProviderAutocompleteInput(input);
+  }
 }
 
 export async function populateExternalProviderEditorInput(
@@ -388,6 +428,7 @@ export async function applyExternalProviderProposalInEditor(
   }
 
   logger.warn("Could not select a matching external provider autocomplete candidate");
+  dismissExternalProviderAutocomplete();
   return false;
 }
 
@@ -416,6 +457,7 @@ export async function findExternalProviderEditorCandidates(
       logger.info(
         `Read ${candidates.length} external provider autocomplete candidate(s)`
       );
+      dismissExternalProviderAutocomplete();
       return candidates;
     }
 
@@ -423,5 +465,6 @@ export async function findExternalProviderEditorCandidates(
   }
 
   logger.info("No external provider autocomplete candidates became available");
+  dismissExternalProviderAutocomplete();
   return [];
 }

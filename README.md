@@ -1,220 +1,137 @@
 # WME Place Harmonizer ROW Edition
 
-WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Editor (WME) focused on harmonizing and validating Places / POIs on the ROW (Rest of World) server.
+WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Editor (WME). It helps ROW editors review Places/POIs against shared standards, highlight issues, and apply selected fixes without making automatic edits on their behalf.
 
-The script is designed to be:
+## For Users
 
-- config-first
-- community-configurable
-- GitHub-managed
-- SDK-first
-- safe by default
+### What the script does
 
-It analyzes selected venues, applies community and chain standards, highlights visible venues on the map, and proposes fixes that can be applied selectively.
+- analyzes the currently selected place
+- matches places against configured chains and category standards
+- shows issues and proposed fixes in a WME sidebar tab
+- scans visible venues on the map and highlights them by status
+- lets you apply supported changes selectively
 
----
+The script is config-driven and uses a separate public data repository for manifests, chains, config, exceptions, and locales:
 
-## Project status
+- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
 
-This repository currently contains the **code MVP**.
+### What you need
 
-The code MVP includes:
+- access to Waze Map Editor
+- Tampermonkey in your browser
+- a built `.user.js` file from this repository or a published release artifact
 
-- WME SDK integration
-- selected venue analysis
-- chain matching
-- category-based standards
-- issue detection
-- config-driven phone format validation
-- proposal generation
-- selective apply flow for supported fields
-- feature editor integration
-- script sidebar tab
-- visible venue scanning
-- map highlights
-- auto scan on pan / zoom with toggle
+### Install the script
 
-The separate data repository is still in progress and will receive its own MVP milestone later.
+1. Get a built userscript file:
+   - `dist/wme-place-harmonizer-row-edition.user.js` for the stable build
+   - `dist/wme-place-harmonizer-row-edition.dev.user.js` for the dev build
+2. Open that file in Tampermonkey.
+3. Install or update the script.
+4. Open Waze Map Editor.
 
----
+If you are working from source instead of a release artifact, follow the developer setup below to generate the `dist/` files first.
 
-## Repository structure
+### Use the script
 
-```text
-src/        TypeScript source code
-docs/       Project design and architecture documents
-dist/       Built userscript output
-```
+1. Open WME and wait for the userscript to initialize.
+2. Select a place.
+3. Review the Harmonization tab in the WME sidebar.
+4. Inspect the detected issues and proposed values.
+5. Select only the changes you want.
+6. Apply the selected fixes.
 
-### Important files
+You can also use the Highlighter / Scan tools to analyze visible venues on the map and color them by severity.
 
-- package.json
-- tsconfig.json
-- vite.config.ts
+### Current MVP behavior
 
-## Related repository
+- no automatic edits are made without explicit user action
+- supported proposals can be applied selectively
+- some fields still require manual editor interaction
+- geometry transitions and some advanced editing flows are intentionally limited
 
-This project uses a separate public data repository for configuration, chains, exceptions and locales:
+### Stable and dev channels
 
-[wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
+The production build defaults to the `stable` data channel. The development build defaults to the `dev` data channel.
 
-The code and data are intentionally separated.
+## For Developers
 
-## Requirements
-
-To build or work on this repository you need:
+### Prerequisites
 
 - Node.js
 - npm
 - Tampermonkey
-- access to Waze Map Editor
+- access to Waze Map Editor for runtime testing
 
-### Install dependencies
+### Setup
 
 ```bash
 npm install
 ```
 
-### Development build
-
-```bash
-npm run build:dev
-```
-
-or watch mode:
+### Common commands
 
 ```bash
 npm run dev
-```
-
-### Production build
-
-```bash
+npm run build:dev
 npm run build:prod
+npm run test
 ```
 
-The built userscript is written to:
+The repository also defines `npm run lint`, but the current checkout does not include an `eslint.config.*` file yet, so ESLint will not run successfully until that configuration is added.
 
-- dev build: `dist/wme-place-harmonizer-row-edition.dev.user.js`
-- production build: `dist/wme-place-harmonizer-row-edition.user.js`
+### Build outputs
 
-Development builds store settings and cache under `WMEPH-ROW:dev:*` in `localStorage`.
-Production builds continue to use `WMEPH-ROW:*`.
+- `npm run build:dev` writes `dist/wme-place-harmonizer-row-edition.dev.user.js`
+- `npm run build:prod` writes `dist/wme-place-harmonizer-row-edition.user.js`
 
-## Load into Tampermonkey
+Dev builds use `WMEPH-ROW:dev:*` local storage keys. Production builds use `WMEPH-ROW:*`.
 
-1. Build the project
-2. Open the generated file in `dist/`
-3. Install or update it in Tampermonkey
-4. Open Waze Map Editor
+### Recommended local workflow
 
-## Current MVP features
+1. Install dependencies with `npm install`.
+2. Run `npm run build:dev` or `npm run dev`.
+3. Load the generated dev userscript into Tampermonkey.
+4. Test the script in WME.
+5. Run `npm run test` before opening a pull request.
+6. Run `npm run lint` as soon as the repository ESLint config is present.
 
-### Feature editor
+### Repository layout
 
-- selected venue analysis
-- top external provider suggestion for missing-provider issues, with Google Maps click-through
-- issue cards
-- lock level recommendation issues
-- suggestions / proposals
-- apply selected fixes for supported fields
-- venue-only rendering
+```text
+src/        TypeScript source code
+tests/      Automated tests
+docs/       Architecture, scope, UI, and release docs
+dist/       Generated userscript output
+scripts/    Build and support scripts
+```
 
-### Script tab
+### Architecture and reference docs
 
-- runtime status
-- manifest/config/chains info
-- reload data
-- auto scan toggle
-- visible venue scan summary
+Useful starting points:
 
-### Map tools
-
-- scan visible venues
-- highlight visible venues
-- severity-based colors
-- auto scan on pan and zoom
-
-## Supported apply fields in MVP
-
-The MVP currently supports selective apply for a limited set of fields.
-
-### Examples include
-
-- name
-- lock level
-- phone
-- url
-- services
-- external provider ids via WME editor autocomplete automation
-- opening hours
-
-### Some fields are intentionally not automatically applied yet, such as
-
-- certain geometry transitions
-- fields requiring manual editor interaction
-
-## Design principles
-
-- no automatic changes without explicit user action
-- community-driven standards via GitHub data files
-- global defaults with local overrides
-- chains and non-chain venues both supported
-- safe fallbacks and runtime resilience
-
-## Key design documents
-
-See the `docs/` folder for the functional and technical design.
-
-Recommended starting points:
-
-- [docs/v1-scope.md](docs/v1-scope.md)
 - [docs/architecture.md](docs/architecture.md)
+- [docs/v1-scope.md](docs/v1-scope.md)
 - [docs/ui-flow.md](docs/ui-flow.md)
 - [docs/build-and-release.md](docs/build-and-release.md)
 
-## Release process for the code repository
+### Cross-repository note
 
-### Before a release
+This repository is the code side of a two-repository system. When behavior, contracts, or runtime data expectations change here, check whether the related data repository also needs updates:
 
-- Make sure all intended code changes are committed
-- Run a production build
-- Test the built userscript in WME
-- Confirm the README and docs are up to date
+- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
 
-### Build for release
+### Release basics
 
-```bash
-npm run build:prod
-```
+1. Run `npm run lint`.
+2. Run `npm run test`.
+3. Run `npm run build:prod`.
+4. Test the production userscript in WME.
+5. Commit the release-ready state and create a tag.
 
-### Commit release-ready state
+If the repository still has no `eslint.config.*` file, treat linting as a known setup gap and rely on tests plus runtime verification in WME until linting is wired up.
 
-```bash
-git add .
-git commit -m "Prepare MVP release"
-```
+## License
 
-### Create a tag
-
-Example:
-
-```bash
-git tag v0.1.0-mvp
-git push origin main
-git push origin v0.1.0-mvp
-```
-
-### Optional GitHub release
-
-After pushing the tag, create a GitHub Release from that tag and attach release notes if desired.
-
-## Notes about data
-
-The code repository is ready for an MVP tag.
-
-The data repository is intentionally versioned separately and should only receive its MVP tag when representative configuration data has been added and validated.
-
-## License / usage
-
-Add the intended license for the project here when you decide on it.
+[GNU GPL v3](LICENSE)

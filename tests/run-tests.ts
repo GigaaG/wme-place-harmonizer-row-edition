@@ -2,6 +2,7 @@ import "./evaluate-place.phone-format.test.ts";
 import "./evaluate-place.city-name.test.ts";
 import "./evaluate-place.url-format.test.ts";
 import "./evaluate-place.opening-hours.test.ts";
+import "./evaluate-place.navigation-points.test.ts";
 import "./category-standards.test.ts";
 import "./evaluate-place.aliases.test.ts";
 import "./evaluate-place.editor-notes.test.ts";

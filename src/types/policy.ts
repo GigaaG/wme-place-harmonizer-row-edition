@@ -8,6 +8,7 @@ export interface EffectivePlacePolicy {
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;
+  navigationPoints?: PresenceRequirement;
   externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;

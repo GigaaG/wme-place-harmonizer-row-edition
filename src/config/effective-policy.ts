@@ -164,6 +164,10 @@ function mergeCategoryStandardIntoPolicy(
         trueValue: "required"
       })
     ),
+    navigationPoints: mergePresenceRequirement(
+      current.navigationPoints,
+      standard.navigationPoints
+    ),
     externalProviderIds: mergePresenceRequirement(
       current.externalProviderIds,
       standard.externalProviderIds,
@@ -219,6 +223,10 @@ function mergeChainPolicyIntoPolicy(
         key: "requireOpeningHours",
         trueValue: "required"
       })
+    ),
+    navigationPoints: mergePresenceRequirement(
+      current.navigationPoints,
+      chainPolicy.navigationPoints
     ),
     externalProviderIds: mergePresenceRequirement(
       current.externalProviderIds,

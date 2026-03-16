@@ -420,6 +420,35 @@ export function evaluatePlace(
     }
   }
 
+  //
+  // NAVIGATION POINTS
+  //
+
+  if (policy.navigationPoints && place.geometry === "polygon") {
+    const navigationPointCount =
+      typeof place.navigationPointCount === "number" && place.navigationPointCount > 0
+        ? place.navigationPointCount
+        : 0;
+
+    const issue = buildPresenceIssue({
+      field: "navigationPoints",
+      rulePrefix: "navigationPoints",
+      requirement: policy.navigationPoints,
+      hasValue: navigationPointCount > 0,
+      currentValue: navigationPointCount,
+      messages: {
+        required: "Polygon venues must have at least one navigation point",
+        recommended: "Polygon venues should have at least one navigation point",
+        discouraged: "Polygon venues should not have navigation points",
+        forbidden: "Polygon venues must not have navigation points"
+      }
+    });
+
+    if (issue) {
+      issues.push(issue);
+    }
+  }
+
   const expectedOpeningHours = chain?.standard?.openingHoursTemplate;
   if (expectedOpeningHours && expectedOpeningHours.length > 0) {
     const normalizeHours = (hours: typeof expectedOpeningHours) =>

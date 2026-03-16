@@ -55,6 +55,7 @@ export interface CategoryStandard {
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;
+  navigationPoints?: PresenceRequirement;
   externalProviderIds?: PresenceRequirement;
   services?: ServiceStandard;
   address?: AddressPolicy;

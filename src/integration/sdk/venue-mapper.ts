@@ -30,6 +30,22 @@ function mapOpeningHours(openingHours: any[] | undefined): OpeningHourDefinition
     }));
 }
 
+function mapNavigationPointCount(venue: any): number | undefined {
+  const candidates = [venue?.navigationPoints, venue?.navigationPoint];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((point) => point !== null && point !== undefined).length;
+    }
+
+    if (candidate && typeof candidate === "object") {
+      return 1;
+    }
+  }
+
+  return undefined;
+}
+
 function readNumericValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
@@ -127,6 +143,7 @@ export function mapVenueToPlaceLike(venue: any): PlaceLike {
     services: venue.services ?? [],
 
     openingHours: mapOpeningHours(venue.openingHours),
+    navigationPointCount: mapNavigationPointCount(venue),
     externalProviderIds: venue.externalProviderIds ?? [],
     address: mapAddress(venue),
 

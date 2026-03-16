@@ -17,7 +17,8 @@ const runtimeConfig: HarmonizerConfig = {
         recommended: "polygon",
         allowed: ["point", "polygon"]
       },
-      lockLevel: 2
+      lockLevel: 2,
+      navigationPoints: "required"
     },
     BUS_STATION: {
       editorNotes: [
@@ -78,6 +79,32 @@ runTest("applies Forest standards when sdk category objects include numeric ids"
   assert.deepEqual(
     issues.map((issue) => issue.ruleId),
     ["geometry.recommended", "lockLevelRecommendation"]
+  );
+});
+
+runTest("applies category navigation-point standards only to polygon venues", () => {
+  const rawCategories = [{ id: "183", name: "Forest" }];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => runtimeConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const place: PlaceLike = {
+    name: "Polygon Forest",
+    categories: normalizedCategories,
+    geometry: "polygon",
+    lockLevel: 1,
+    navigationPointCount: 0
+  };
+
+  const issues = evaluatePlace(
+    place,
+    resolveEffectivePolicy({ categoryStandards })
+  );
+
+  assert.equal(categoryStandards.length, 1);
+  assert.deepEqual(
+    issues.map((issue) => issue.ruleId).sort(),
+    ["lockLevelRecommendation", "navigationPoints.required"]
   );
 });
 

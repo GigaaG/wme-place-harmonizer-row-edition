@@ -47,6 +47,7 @@ export interface ChainPolicyDefinition {
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;
+  navigationPoints?: PresenceRequirement;
   externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;

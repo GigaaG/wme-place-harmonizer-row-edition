@@ -113,6 +113,7 @@ export function generateProposals(
 
       const isPolygonToPoint = current === "polygon" && expected === "point";
       const isPointToPolygon = current === "point" && expected === "polygon";
+      const isApplySupported = isPolygonToPoint || isPointToPolygon;
 
       proposals.push({
         id: buildProposalId(issue),
@@ -122,8 +123,8 @@ export function generateProposals(
         proposedValue: expected,
         reason: issue.message,
         issueRuleId: issue.ruleId,
-        isApplySupported: isPolygonToPoint,
-        actionType: isPolygonToPoint ? "set-field" : "manual-only"
+        isApplySupported,
+        actionType: isApplySupported ? "set-field" : "manual-only"
       });
       continue;
     }

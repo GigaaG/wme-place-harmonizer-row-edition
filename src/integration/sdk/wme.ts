@@ -1,4 +1,4 @@
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/logger.ts";
 
 export interface WmeContext {
   isReady: boolean;

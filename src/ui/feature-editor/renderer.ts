@@ -1,7 +1,10 @@
 import { ensureFeatureEditorContainer } from "./container";
 import type { PlaceIssue } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
-import { groupIssuesForFeatureEditor } from "./issue-groups";
+import {
+  groupIssuesForFeatureEditor,
+  type FeatureEditorIssueGroup
+} from "./issue-groups";
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -184,12 +187,10 @@ function renderProposal(
   return html;
 }
 
-function renderIssue(
-  issue: PlaceIssue,
-  proposals: PlaceProposal[]
-): string {
+function renderIssue(group: FeatureEditorIssueGroup): string {
   let html = "";
-  const colors = getSeverityColors(issue.severity);
+  const colors = getSeverityColors(group.severity);
+  const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
 
   html += `
     <div style="
@@ -203,20 +204,34 @@ function renderIssue(
 
   html += `
     <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
-      ${getSeverityIcon(issue.severity)} ${escapeHtml(getSeverityLabel(issue.severity))}: ${escapeHtml(issue.message)}
+      ${getSeverityIcon(group.severity)} ${escapeHtml(getSeverityLabel(group.severity))}: ${escapeHtml(group.message)}
     </div>
   `;
 
-  if (issue.field) {
+  if (group.field) {
     html += `
       <div style="font-size:12px;color:#666;margin-bottom:4px;">
-        Field: ${escapeHtml(issue.field)}
+        Field: ${escapeHtml(group.field)}
       </div>
     `;
   }
 
-  for (let index = 0; index < proposals.length; index += 1) {
-    html += renderProposal(issue, proposals[index], index);
+  for (let index = 0; index < group.proposals.length; index += 1) {
+    html += renderProposal(group.issues[0], group.proposals[index], index);
+  }
+
+  if (canWhitelist) {
+    html += `
+      <div style="margin-top:8px;">
+        <button
+          type="button"
+          class="wmeph-row-whitelist-issue"
+          data-group-key="${escapeHtml(group.key)}"
+        >
+          Ignore for this venue
+        </button>
+      </div>
+    `;
   }
 
   html += `</div>`;
@@ -318,14 +333,7 @@ export function renderFeatureEditorAnalysis(
     `;
   } else {
     for (const group of issueGroups) {
-      html += renderIssue(
-        {
-          field: group.field,
-          severity: group.severity,
-          message: group.message
-        },
-        group.proposals
-      );
+      html += renderIssue(group);
     }
   }
 

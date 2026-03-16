@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { normalizeCategoryKeys } from "../src/config/category-key.ts";
 import { resolveEffectivePolicy } from "../src/config/effective-policy.ts";
 import { evaluatePlace } from "../src/rules/evaluate-place.ts";
-import type { HarmonizerConfig } from "../src/types/config.ts";
+import type { HarmonizerConfig, RuleConfig } from "../src/types/config.ts";
 import type { PlaceLike } from "../src/types/place.ts";
 
 const runtimeConfig: HarmonizerConfig = {
@@ -24,6 +25,18 @@ const runtimeConfig: HarmonizerConfig = {
       ]
     }
   }
+};
+
+const nlConfig = JSON.parse(
+  readFileSync(
+    new URL("../../wme-place-harmonizer-row-data/config/countries/nl.json", import.meta.url),
+    "utf8"
+  )
+) as HarmonizerConfig;
+
+const enabledCityRule: RuleConfig = {
+  enabled: true,
+  severity: "warning"
 };
 
 function runTest(name: string, fn: () => void): void {
@@ -92,4 +105,31 @@ runTest("emits informational editor notes from matched category standards", () =
       ruleId: "editorNote.category.1"
     }
   ]);
+});
+
+runTest("allows NL train stations to keep the city name in the venue name", () => {
+  const rawCategories = ["TRAIN_STATION"];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => nlConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const place: PlaceLike = {
+    name: "Amsterdam Centraal",
+    categories: normalizedCategories,
+    address: {
+      city: "Amsterdam"
+    }
+  };
+
+  const issues = evaluatePlace(
+    place,
+    resolveEffectivePolicy({ categoryStandards }),
+    undefined,
+    {
+      cityInVenueNameRule: enabledCityRule
+    }
+  );
+
+  assert.equal(categoryStandards.length, 1);
+  assert.equal(issues.some((issue) => issue.ruleId === "cityInVenueName"), false);
 });

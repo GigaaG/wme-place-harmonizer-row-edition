@@ -4,15 +4,22 @@ import { resolveCategoryStandards } from "../config/category-standards";
 import { resolveEffectivePolicy } from "../config/effective-policy";
 import { evaluatePlace } from "../rules/evaluate-place";
 import type { VisibleVenueScanSummary, ScannedVenueResult, ScanSeverity } from "../types/scan";
+import type { WhitelistRuntimeSnapshot } from "../types/whitelist";
+import {
+  filterWhitelistedAnalysis,
+  loadWhitelistStore
+} from "../whitelist/manager";
 
 export function scanVisibleVenues(params: {
   venues: any[];
   runtimeConfig: any;
   runtimeChains: any;
+  whitelistRuntime?: WhitelistRuntimeSnapshot;
 }): VisibleVenueScanSummary {
-  const { venues, runtimeConfig, runtimeChains } = params;
+  const { venues, runtimeConfig, runtimeChains, whitelistRuntime } = params;
 
   const results: ScannedVenueResult[] = [];
+  const whitelistStore = whitelistRuntime ? loadWhitelistStore() : undefined;
 
   let ok = 0;
   let warning = 0;
@@ -37,9 +44,18 @@ export function scanVisibleVenues(params: {
       phoneFormatting: runtimeConfig.formatting?.phone,
       urlFormatting: runtimeConfig.formatting?.url
     });
+    const visibleIssues = whitelistRuntime
+      ? filterWhitelistedAnalysis({
+          placeId: String(venue.id),
+          issues,
+          proposals: [],
+          runtime: whitelistRuntime,
+          store: whitelistStore
+        }).issues
+      : issues;
 
-    const hasErrors = issues.some((issue) => issue.severity === "error");
-    const hasWarnings = issues.some((issue) => issue.severity === "warning");
+    const hasErrors = visibleIssues.some((issue) => issue.severity === "error");
+    const hasWarnings = visibleIssues.some((issue) => issue.severity === "warning");
 
     let severity: ScanSeverity = "ok";
 
@@ -57,7 +73,7 @@ export function scanVisibleVenues(params: {
     results.push({
       venueId: venue.id,
       name: place.name,
-      issueCount: issues.length,
+      issueCount: visibleIssues.length,
       hasErrors,
       hasWarnings,
       severity

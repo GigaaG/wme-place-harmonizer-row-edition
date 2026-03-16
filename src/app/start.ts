@@ -20,6 +20,7 @@ import {
 } from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
 import { renderFeatureEditorAnalysis } from "../ui/feature-editor/renderer";
+import { groupIssuesForFeatureEditor } from "../ui/feature-editor/issue-groups";
 import {
   setLatestAnalysisState,
   getLatestAnalysisState,
@@ -32,6 +33,7 @@ import {
 import { generateProposals } from "../proposals/generate-proposals";
 import { getSelectedProposals } from "../ui/feature-editor/actions";
 import { applyVenueProposals } from "../integration/sdk/venue-updater";
+import type { PlaceProposal } from "../types/proposal";
 import { setSidebarDebugState, getSidebarDebugState } from "./app-state";
 import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
 import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/actions";
@@ -54,6 +56,11 @@ import {
   buildExternalProviderSuggestionProposals,
   findSuggestedExternalProviders
 } from "../integration/sdk/external-provider-suggestions";
+import type { WhitelistEntry, WhitelistRuntimeSnapshot } from "../types/whitelist";
+import {
+  filterWhitelistedAnalysis,
+  upsertWhitelistEntries
+} from "../whitelist/manager";
 
 //
 // Runtime containers
@@ -325,6 +332,48 @@ function formatAnalysisCountLabel(issues: PlaceIssue[]): string {
   return `${findingsLabel}, including ${infoCount} info`;
 }
 
+function getCurrentWhitelistRuntimeSnapshot():
+  | WhitelistRuntimeSnapshot
+  | null {
+  if (!runtimeConfig || !runtimeChains) {
+    return null;
+  }
+
+  return {
+    configId: runtimeConfig.id,
+    configVersion: runtimeConfig.version,
+    chainsId: runtimeChains.id,
+    chainsVersion: runtimeChains.version
+  };
+}
+
+function applyWhitelistToAnalysis(params: {
+  venueId: string;
+  issues: PlaceIssue[];
+  proposals: PlaceProposal[];
+}): {
+  issues: PlaceIssue[];
+  proposals: PlaceProposal[];
+  suppressedIssueCount: number;
+} {
+  const whitelistRuntime = getCurrentWhitelistRuntimeSnapshot();
+
+  if (!whitelistRuntime) {
+    return {
+      issues: params.issues,
+      proposals: params.proposals,
+      suppressedIssueCount: 0
+    };
+  }
+
+  return filterWhitelistedAnalysis({
+    placeId: params.venueId,
+    issues: params.issues,
+    proposals: params.proposals,
+    runtime: whitelistRuntime
+  });
+}
+
 function renderLatestVenueAnalysis(): void {
   const latest = getLatestAnalysisState();
 
@@ -340,6 +389,7 @@ function renderLatestVenueAnalysis(): void {
     latest.statusMessage
   );
   wireApplyButton();
+  wireWhitelistButtons();
 }
 
 function applyExternalProviderSuggestionToIssues(
@@ -401,11 +451,16 @@ async function refreshExternalProviderSuggestions(params: {
     params.issue,
     buildSuggestedExternalProviderIssueMessage(params.issue, topSuggestion)
   );
+  const filteredAnalysis = applyWhitelistToAnalysis({
+    venueId: latest.venueId,
+    issues: issuesWithSuggestion,
+    proposals: [...retainedProposals, ...suggestionProposals]
+  });
 
   setLatestAnalysisState({
     ...latest,
-    issues: issuesWithSuggestion,
-    proposals: [...retainedProposals, ...suggestionProposals]
+    issues: filteredAnalysis.issues,
+    proposals: filteredAnalysis.proposals
   });
 
   logger.info(
@@ -540,7 +595,8 @@ async function scanVisibleVenuesFromMap(
   const summary = scanVisibleVenues({
     venues,
     runtimeConfig,
-    runtimeChains
+    runtimeChains,
+    whitelistRuntime: getCurrentWhitelistRuntimeSnapshot() ?? undefined
   });
 
   const highlightRenderResult = renderHighlights(summary, venues, {
@@ -737,6 +793,124 @@ function wireApplyButton(): void {
   };
 }
 
+function buildWhitelistEntriesForGroup(params: {
+  venueId: string;
+  chainId: string | null;
+  issues: PlaceIssue[];
+}): WhitelistEntry[] {
+  const whitelistRuntime = getCurrentWhitelistRuntimeSnapshot();
+
+  if (!whitelistRuntime) {
+    return [];
+  }
+
+  const now = new Date().toISOString();
+  const entries = new Map<string, WhitelistEntry>();
+
+  for (const issue of params.issues) {
+    if (!issue.ruleId) {
+      continue;
+    }
+
+    const entry: WhitelistEntry = {
+      placeId: params.venueId,
+      ruleId: issue.ruleId,
+      field: issue.field,
+      scope: "place",
+      createdAt: now,
+      reason: "Locally ignored from the feature editor",
+      chainId: params.chainId ?? undefined,
+      country: runtimeCountry,
+      configId: whitelistRuntime.configId,
+      configVersion: whitelistRuntime.configVersion,
+      chainsId: whitelistRuntime.chainsId,
+      chainsVersion: whitelistRuntime.chainsVersion
+    };
+
+    entries.set(`${entry.placeId}::${entry.ruleId}::${entry.field}`, entry);
+  }
+
+  return Array.from(entries.values());
+}
+
+function wireWhitelistButtons(): void {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(".wmeph-row-whitelist-issue")
+  );
+
+  if (buttons.length === 0) {
+    return;
+  }
+
+  for (const button of buttons) {
+    button.onclick = async () => {
+      button.setAttribute("disabled", "true");
+
+      try {
+        const latest = getLatestAnalysisState();
+
+        if (!latest?.isVenueSelection) {
+          logger.warn("Whitelist clicked, but no venue analysis state is available");
+          return;
+        }
+
+        const groupKey = button.dataset.groupKey;
+
+        if (!groupKey) {
+          logger.warn("Whitelist clicked without an issue-group key");
+          return;
+        }
+
+        const group = groupIssuesForFeatureEditor(
+          latest.issues,
+          latest.proposals
+        ).find((candidate) => candidate.key === groupKey);
+
+        if (!group) {
+          logger.warn(`Whitelist group not found: ${groupKey}`);
+          return;
+        }
+
+        const entries = buildWhitelistEntriesForGroup({
+          venueId: latest.venueId,
+          chainId: latest.chainId,
+          issues: group.issues
+        });
+
+        if (entries.length === 0) {
+          logger.warn(`Whitelist group ${groupKey} has no rule-bound issues`);
+          return;
+        }
+
+        const changedCount = upsertWhitelistEntries(entries);
+        const filteredAnalysis = applyWhitelistToAnalysis({
+          venueId: latest.venueId,
+          issues: latest.issues,
+          proposals: latest.proposals
+        });
+
+        setLatestAnalysisState({
+          ...latest,
+          issues: filteredAnalysis.issues,
+          proposals: filteredAnalysis.proposals,
+          statusMessage: {
+            kind: "success",
+            text:
+              changedCount > 0
+                ? `Ignored ${entries.length} finding(s) for this venue until the active config or chains version changes`
+                : "These findings were already ignored for this venue"
+          }
+        });
+
+        renderLatestVenueAnalysis();
+        await scanVisibleVenuesFromMap("manual");
+      } finally {
+        button.removeAttribute("disabled");
+      }
+    };
+  }
+}
+
 async function analyzeVenue(params: {
   venue: any;
 }): Promise<void> {
@@ -804,6 +978,11 @@ async function analyzeVenue(params: {
   });
   const editorLockLevel = getCurrentEditorLockLevel();
   const proposals = generateProposals(issues, { editorLockLevel });
+  const filteredAnalysis = applyWhitelistToAnalysis({
+    venueId: String(venue.id),
+    issues,
+    proposals
+  });
 
   for (const issue of issues) {
     logger.info(
@@ -823,7 +1002,7 @@ async function analyzeVenue(params: {
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
       runtimeChainsCount: runtimeChains.items.length,
-      lastStatus: `Analyzed venue: ${place.name} (${formatAnalysisCountLabel(issues)})`
+      lastStatus: `Analyzed venue: ${place.name} (${formatAnalysisCountLabel(filteredAnalysis.issues)})`
     });
 
     const updatedSidebarState = getSidebarDebugState();
@@ -838,8 +1017,8 @@ async function analyzeVenue(params: {
     venueId: String(venue.id),
     placeName: place.name,
     chainId: matchResult.chain?.id ?? null,
-    issues,
-    proposals,
+    issues: filteredAnalysis.issues,
+    proposals: filteredAnalysis.proposals,
     currentServices: place.services ?? [],
     currentAliases: place.aliases ?? [],
     currentExternalProviderIds: place.externalProviderIds ?? [],

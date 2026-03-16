@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { normalizeCategoryKeys } from "../src/config/category-key.ts";
+import { resolveCategoryStandards } from "../src/config/category-standards.ts";
 import { resolveEffectivePolicy } from "../src/config/effective-policy.ts";
 import { evaluatePlace } from "../src/rules/evaluate-place.ts";
 import type { HarmonizerConfig, RuleConfig } from "../src/types/config.ts";
@@ -245,6 +246,25 @@ runTest("requires external provider ids for NL restaurants", () => {
   assert.equal(categoryStandards.length, 1);
   assert.equal(
     issues.some((issue) => issue.ruleId === "externalProvider.required"),
+    true
+  );
+});
+
+runTest("leaf subcategories inherit missing fields from their main category", () => {
+  const rawCategories = ["JEWELRY"];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = resolveCategoryStandards(nlConfig, normalizedCategories);
+  const place: PlaceLike = {
+    name: "Test Jewelry",
+    categories: normalizedCategories
+  };
+  const policy = resolveEffectivePolicy({ categoryStandards });
+  const issues = evaluatePlace(place, policy);
+
+  assert.deepEqual(normalizedCategories, ["JEWELRY"]);
+  assert.equal(policy.openingHours, "recommended");
+  assert.equal(
+    issues.some((issue) => issue.ruleId === "openingHours.recommended"),
     true
   );
 });

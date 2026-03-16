@@ -1,6 +1,7 @@
 import type { HarmonizerConfig, CategoryStandard } from "../types/config";
-import { logger } from "../logging/logger";
-import { normalizeCategoryKey } from "./category-key";
+import { logger } from "../logging/logger.ts";
+import { normalizeCategoryKey } from "./category-key.ts";
+import { expandCategoryHierarchy } from "./category-hierarchy.ts";
 
 export function resolveCategoryStandards(
   config: HarmonizerConfig,
@@ -22,15 +23,21 @@ export function resolveCategoryStandards(
 
   for (const category of categories) {
     const normalizedCategory = normalizeCategoryKey(category);
-    if (!normalizedCategory || matchedKeys.has(normalizedCategory)) {
+    if (!normalizedCategory) {
       continue;
     }
 
-    const matched = standardLookup.get(normalizedCategory);
-    if (matched) {
-      logger.info(`Matched category standard: ${matched.key}`);
-      matches.push(matched.standard);
-      matchedKeys.add(normalizedCategory);
+    for (const categoryKey of expandCategoryHierarchy(normalizedCategory)) {
+      if (matchedKeys.has(categoryKey)) {
+        continue;
+      }
+
+      const matched = standardLookup.get(categoryKey);
+      if (matched) {
+        logger.info(`Matched category standard: ${matched.key}`);
+        matches.push(matched.standard);
+        matchedKeys.add(categoryKey);
+      }
     }
   }
 

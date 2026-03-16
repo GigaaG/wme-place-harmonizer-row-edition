@@ -173,3 +173,26 @@ runTest("allows NL train stations to keep the city name in the venue name", () =
   assert.equal(categoryStandards.length, 1);
   assert.equal(issues.some((issue) => issue.ruleId === "cityInVenueName"), false);
 });
+
+runTest("requires external provider ids for NL restaurants", () => {
+  const rawCategories = ["RESTAURANT"];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => nlConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const place: PlaceLike = {
+    name: "Test Restaurant",
+    categories: normalizedCategories
+  };
+
+  const issues = evaluatePlace(
+    place,
+    resolveEffectivePolicy({ categoryStandards })
+  );
+
+  assert.equal(categoryStandards.length, 1);
+  assert.equal(
+    issues.some((issue) => issue.ruleId === "externalProvider.required"),
+    true
+  );
+});

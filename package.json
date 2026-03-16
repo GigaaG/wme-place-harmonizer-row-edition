@@ -1,6 +1,6 @@
 {
   "name": "wme-place-harmonizer-row-edition",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript userscript for Waze Map Editor ROW Edition place harmonization",
   "license": "GPL-3.0-only",
   "private": true,

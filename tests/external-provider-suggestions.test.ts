@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildGoogleMapsPlaceUrl,
   buildSuggestedExternalProviderIssueMessage,
   buildExternalProviderSuggestionProposals,
+  CATEGORY_GOOGLE_PLACE_TYPE_MAP,
   rankExternalProviderSuggestions,
   resolveNearbySearchTypes,
   scoreExternalProviderName
@@ -33,6 +35,29 @@ runTest("maps WME categories to WAZEPT-style Google nearbySearch types", () => {
     }),
     ["supermarket", "restaurant"]
   );
+});
+
+runTest("expands categories to multiple official Google nearbySearch types when needed", () => {
+  assert.deepEqual(resolveNearbySearchTypes({ categories: ["RELIGIOUS_CENTER"] }), [
+    "church",
+    "mosque",
+    "synagogue",
+    "hindu_temple"
+  ]);
+});
+
+runTest("covers every official WME venue category in the Google nearbySearch map", () => {
+  const sdkValues = JSON.parse(
+    readFileSync(
+      new URL("../../wme-place-harmonizer-row-data/reference/sdk-values.json", import.meta.url),
+      "utf8"
+    )
+  ) as { categoryIds: string[] };
+  const missingCategories = sdkValues.categoryIds.filter(
+    (categoryId) => !(categoryId in CATEGORY_GOOGLE_PLACE_TYPE_MAP)
+  );
+
+  assert.deepEqual(missingCategories, []);
 });
 
 runTest("ranks closer and stronger nearby provider matches first", () => {

@@ -12,7 +12,7 @@ const runtimeConfig: HarmonizerConfig = {
   type: "country-config",
   version: 1,
   categoryStandards: {
-    FOREST: {
+    FOREST_GROVE: {
       geometry: {
         recommended: "polygon",
         allowed: ["point", "polygon"]
@@ -50,14 +50,27 @@ function runTest(name: string, fn: () => void): void {
   }
 }
 
-runTest("prefers descriptive category fields over opaque ids", () => {
-  assert.deepEqual(normalizeCategoryKeys([{ id: "183", name: "Forest" }]), [
-    "FOREST"
+runTest("falls back to descriptive category fields when ids are opaque", () => {
+  assert.deepEqual(normalizeCategoryKeys([{ id: "183", name: "Forest Grove" }]), [
+    "FOREST_GROVE"
   ]);
 });
 
-runTest("applies Forest standards when sdk category objects include numeric ids", () => {
-  const rawCategories = [{ id: "183", name: "Forest" }];
+runTest("prefers canonical SDK subcategory ids over localized names", () => {
+  assert.deepEqual(
+    normalizeCategoryKeys([
+      {
+        categoryId: "NATURAL_FEATURES",
+        subCategoryId: "FOREST_GROVE",
+        localizedName: "Forest"
+      }
+    ]),
+    ["FOREST_GROVE"]
+  );
+});
+
+runTest("applies Forest Grove standards when sdk category objects include numeric ids", () => {
+  const rawCategories = [{ id: "183", name: "Forest Grove" }];
   const normalizedCategories = normalizeCategoryKeys(rawCategories);
   const categoryStandards = normalizedCategories
     .map((category) => runtimeConfig.categoryStandards?.[category])
@@ -83,7 +96,7 @@ runTest("applies Forest standards when sdk category objects include numeric ids"
 });
 
 runTest("applies category navigation-point standards only to polygon venues", () => {
-  const rawCategories = [{ id: "183", name: "Forest" }];
+  const rawCategories = [{ id: "183", name: "Forest Grove" }];
   const normalizedCategories = normalizeCategoryKeys(rawCategories);
   const categoryStandards = normalizedCategories
     .map((category) => runtimeConfig.categoryStandards?.[category])

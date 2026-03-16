@@ -1,6 +1,7 @@
 const DESCRIPTIVE_CATEGORY_FIELD_CANDIDATES = [
   "category",
   "name",
+  "localizedName",
   "key",
   "slug",
   "value",
@@ -8,10 +9,15 @@ const DESCRIPTIVE_CATEGORY_FIELD_CANDIDATES = [
 ];
 
 const IDENTIFIER_CATEGORY_FIELD_CANDIDATES = [
+  "subCategoryId",
   "categoryId",
   "categoryID",
   "id"
 ];
+
+function looksCanonicalCategoryId(value: string): boolean {
+  return /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$/.test(value.trim());
+}
 
 function normalizeCategoryString(value: string): string | undefined {
   const normalized = value
@@ -49,6 +55,15 @@ function extractCategoryString(category: unknown): string | undefined {
   }
 
   const record = category as Record<string, unknown>;
+  const identifierValue = readFirstCategoryField(
+    record,
+    IDENTIFIER_CATEGORY_FIELD_CANDIDATES
+  );
+
+  if (identifierValue && looksCanonicalCategoryId(identifierValue)) {
+    return identifierValue;
+  }
+
   const descriptiveValue = readFirstCategoryField(
     record,
     DESCRIPTIVE_CATEGORY_FIELD_CANDIDATES
@@ -65,7 +80,7 @@ function extractCategoryString(category: unknown): string | undefined {
     }
   }
 
-  return readFirstCategoryField(record, IDENTIFIER_CATEGORY_FIELD_CANDIDATES);
+  return identifierValue;
 }
 
 export function normalizeCategoryKey(category: unknown): string | undefined {

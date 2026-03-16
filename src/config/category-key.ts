@@ -45,6 +45,34 @@ function readFirstCategoryField(
   return undefined;
 }
 
+function extractCanonicalCategoryHierarchy(
+  record: Record<string, unknown>
+): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  const parentIdentifier = readFirstCategoryField(record, [
+    "categoryId",
+    "categoryID"
+  ]);
+  const subCategoryIdentifier = readFirstCategoryField(record, ["subCategoryId"]);
+
+  for (const candidate of [parentIdentifier, subCategoryIdentifier]) {
+    if (!candidate || !looksCanonicalCategoryId(candidate)) {
+      continue;
+    }
+
+    const normalizedCandidate = normalizeCategoryString(candidate);
+    if (!normalizedCandidate || seen.has(normalizedCandidate)) {
+      continue;
+    }
+
+    seen.add(normalizedCandidate);
+    normalized.push(normalizedCandidate);
+  }
+
+  return normalized;
+}
+
 function extractCategoryString(category: unknown): string | undefined {
   if (typeof category === "string") {
     return category;
@@ -94,6 +122,25 @@ export function normalizeCategoryKeys(categories: unknown): string[] {
   const normalized: string[] = [];
 
   for (const value of values) {
+    if (value && typeof value === "object") {
+      const hierarchy = extractCanonicalCategoryHierarchy(
+        value as Record<string, unknown>
+      );
+
+      if (hierarchy.length > 0) {
+        for (const key of hierarchy) {
+          if (seen.has(key)) {
+            continue;
+          }
+
+          seen.add(key);
+          normalized.push(key);
+        }
+
+        continue;
+      }
+    }
+
     const key = normalizeCategoryKey(value);
     if (!key || seen.has(key)) {
       continue;

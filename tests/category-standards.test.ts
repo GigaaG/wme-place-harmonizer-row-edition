@@ -28,6 +28,58 @@ const runtimeConfig: HarmonizerConfig = {
   }
 };
 
+const hierarchyConfig: HarmonizerConfig = {
+  id: "hierarchy-config",
+  type: "country-config",
+  version: 1,
+  categoryStandards: {
+    PARENT_CATEGORY: {
+      geometry: {
+        required: "point",
+        allowed: ["point"]
+      },
+      lockLevel: 1,
+      cityInVenueName: true,
+      phone: "required",
+      url: "required",
+      openingHours: "required",
+      navigationPoints: "recommended",
+      externalProviderIds: "required",
+      services: {
+        required: ["PARENT_SERVICE"]
+      },
+      address: {
+        city: "required",
+        street: "required",
+        houseNumber: "recommended"
+      },
+      editorNotes: ["Parent note"]
+    },
+    CHILD_CATEGORY: {
+      geometry: {
+        required: "polygon",
+        allowed: ["polygon"]
+      },
+      lockLevel: 4,
+      cityInVenueName: false,
+      phone: "forbidden",
+      url: "discouraged",
+      openingHours: "forbidden",
+      navigationPoints: "forbidden",
+      externalProviderIds: "forbidden",
+      services: {
+        forbidden: ["CHILD_SERVICE"]
+      },
+      address: {
+        city: "forbidden",
+        street: "discouraged",
+        houseNumber: "forbidden"
+      },
+      editorNotes: ["Child note"]
+    }
+  }
+};
+
 const nlConfig = JSON.parse(
   readFileSync(
     new URL("../../wme-place-harmonizer-row-data/config/countries/nl.json", import.meta.url),
@@ -65,7 +117,7 @@ runTest("prefers canonical SDK subcategory ids over localized names", () => {
         localizedName: "Forest"
       }
     ]),
-    ["FOREST_GROVE"]
+    ["NATURAL_FEATURES", "FOREST_GROVE"]
   );
 });
 
@@ -195,4 +247,85 @@ runTest("requires external provider ids for NL restaurants", () => {
     issues.some((issue) => issue.ruleId === "externalProvider.required"),
     true
   );
+});
+
+runTest("subcategory overrides main category for NL transport external provider rules", () => {
+  const rawCategories = [
+    {
+      categoryId: "TRANSPORTATION",
+      subCategoryId: "JUNCTION_INTERCHANGE",
+      localizedName: "Junction / Interchange"
+    }
+  ];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => nlConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const missingIdsPlace: PlaceLike = {
+    name: "Test Interchange",
+    categories: normalizedCategories
+  };
+  const presentIdsPlace: PlaceLike = {
+    name: "Test Interchange",
+    categories: normalizedCategories,
+    externalProviderIds: ["demo-id"]
+  };
+  const policy = resolveEffectivePolicy({ categoryStandards });
+
+  assert.deepEqual(normalizedCategories, ["TRANSPORTATION", "JUNCTION_INTERCHANGE"]);
+  assert.equal(policy.externalProviderIds, "forbidden");
+  assert.equal(
+    evaluatePlace(missingIdsPlace, policy).some(
+      (issue) => issue.ruleId === "externalProvider.required"
+    ),
+    false
+  );
+  assert.equal(
+    evaluatePlace(presentIdsPlace, policy).some(
+      (issue) => issue.ruleId === "externalProvider.forbidden"
+    ),
+    true
+  );
+});
+
+runTest("subcategory overrides main category across overlapping policy fields", () => {
+  const rawCategories = [
+    {
+      categoryId: "PARENT_CATEGORY",
+      subCategoryId: "CHILD_CATEGORY",
+      localizedName: "Child category"
+    }
+  ];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => hierarchyConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const policy = resolveEffectivePolicy({ categoryStandards });
+
+  assert.deepEqual(normalizedCategories, ["PARENT_CATEGORY", "CHILD_CATEGORY"]);
+  assert.deepEqual(policy, {
+    geometry: {
+      required: "polygon",
+      allowed: ["polygon"]
+    },
+    lockLevel: 4,
+    cityInVenueName: false,
+    phone: "forbidden",
+    url: "discouraged",
+    openingHours: "forbidden",
+    navigationPoints: "forbidden",
+    externalProviderIds: "forbidden",
+    services: {
+      required: ["PARENT_SERVICE"],
+      recommended: undefined,
+      discouraged: undefined,
+      forbidden: ["CHILD_SERVICE"]
+    },
+    address: {
+      city: "forbidden",
+      street: "discouraged",
+      houseNumber: "forbidden"
+    },
+    editorNotes: ["Parent note", "Child note"]
+  });
 });

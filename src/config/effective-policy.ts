@@ -2,31 +2,7 @@ import type { ChainPolicyDefinition, GeometryPolicy, ServicePolicy } from "../ty
 import type { AddressPolicy, PresenceRequirement } from "../types/address";
 import type { CategoryStandard } from "../types/config";
 import type { EffectivePlacePolicy } from "../types/policy";
-
-function mergeEditorNotes(
-  base?: string[],
-  override?: string[]
-): string[] | undefined {
-  if (!base && !override) {
-    return undefined;
-  }
-
-  const merged: string[] = [];
-  const seen = new Set<string>();
-
-  for (const candidate of [...(base ?? []), ...(override ?? [])]) {
-    const note = typeof candidate === "string" ? candidate.trim() : "";
-
-    if (note.length === 0 || seen.has(note)) {
-      continue;
-    }
-
-    seen.add(note);
-    merged.push(note);
-  }
-
-  return merged;
-}
+import { mergeLocalizedTextLists } from "../i18n/locale-utils.ts";
 
 function mergeGeometryPolicy(
   base?: GeometryPolicy,
@@ -180,7 +156,7 @@ function mergeCategoryStandardIntoPolicy(
     ),
     services: mergeServicePolicy(current.services, standard.services),
     address: mergeAddressPolicy(current.address, standard.address),
-    editorNotes: mergeEditorNotes(current.editorNotes, standard.editorNotes)
+    editorNotes: mergeLocalizedTextLists(current.editorNotes, standard.editorNotes)
   };
 }
 

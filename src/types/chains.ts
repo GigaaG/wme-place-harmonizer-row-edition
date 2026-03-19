@@ -1,4 +1,5 @@
 import type { AddressPolicy, PresenceRequirement } from "./address";
+import type { LocalizedTextList } from "./i18n";
 
 export type GeometryType = "point" | "polygon";
 
@@ -72,7 +73,7 @@ export interface ChainRecord {
   policy?: ChainPolicyDefinition;
   scope?: ChainScopeDefinition;
   meta?: ChainMetaDefinition;
-  editorNotes?: string[];
+  editorNotes?: LocalizedTextList;
 }
 
 export interface ChainDataset {

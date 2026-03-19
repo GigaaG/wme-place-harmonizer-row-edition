@@ -1,5 +1,6 @@
 import type { GeometryType } from "./chains";
 import type { AddressPolicy, PresenceRequirement } from "./address";
+import type { LocalizedTextList } from "./i18n";
 
 export interface ConfigMeta {
   name?: string;
@@ -22,12 +23,14 @@ export interface PhoneFormattingConfig {
   validationPatterns?: string[];
   validationExamples?: string[];
   validationMessage?: string;
+  validationMessageKey?: string;
 }
 
 export interface UrlFormattingConfig {
   validationPatterns?: string[];
   validationExamples?: string[];
   validationMessage?: string;
+  validationMessageKey?: string;
 }
 
 export interface FormattingConfig {
@@ -59,7 +62,7 @@ export interface CategoryStandard {
   externalProviderIds?: PresenceRequirement;
   services?: ServiceStandard;
   address?: AddressPolicy;
-  editorNotes?: string[];
+  editorNotes?: LocalizedTextList;
 }
 
 export interface HarmonizerConfig {

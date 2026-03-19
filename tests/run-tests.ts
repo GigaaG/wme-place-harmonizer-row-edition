@@ -1,3 +1,4 @@
+import "./test-i18n.ts";
 import "./evaluate-place.phone-format.test.ts";
 import "./evaluate-place.city-name.test.ts";
 import "./evaluate-place.url-format.test.ts";
@@ -12,3 +13,4 @@ import "./feature-editor-grouping.test.ts";
 import "./venue-updater.geometry.test.ts";
 import "./venue-save-scan.test.ts";
 import "./whitelist-manager.test.ts";
+import "./i18n-utils.test.ts";

@@ -1,5 +1,6 @@
 import type { PlaceIssue } from "../types/issue";
 import type { PlaceProposal } from "../types/proposal";
+import { t } from "../i18n/runtime.ts";
 
 const APPLY_SUPPORTED_FIELDS = new Set([
   "name",
@@ -154,8 +155,15 @@ export function generateProposals(
         editorLockLevel < recommendedLockLevel;
       const reason = isCappedByEditor
         ? canApply
-          ? `${issue.message}. Apply will raise the venue to ${appliedLockLevel}, capped by your editor lock level ${editorLockLevel}.`
-          : `${issue.message}. Your editor lock level ${editorLockLevel} cannot raise this venue further.`
+          ? t("proposal.lockLevel.cappedRaise", {
+              issueMessage: issue.message,
+              lockLevel: appliedLockLevel,
+              editorLockLevel
+            })
+          : t("proposal.lockLevel.cappedCannotRaise", {
+              issueMessage: issue.message,
+              editorLockLevel
+            })
         : issue.message;
 
       proposals.push({

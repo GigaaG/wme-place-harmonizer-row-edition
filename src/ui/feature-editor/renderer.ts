@@ -5,6 +5,7 @@ import {
   groupIssuesForFeatureEditor,
   type FeatureEditorIssueGroup
 } from "./issue-groups";
+import { t } from "../../i18n/runtime.ts";
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -20,14 +21,14 @@ function getSeverityIcon(severity: string): string {
 
 function getSeverityLabel(severity: string): string {
   if (severity === "error") {
-    return "Error";
+    return t("severity.error");
   }
 
   if (severity === "warning") {
-    return "Warning";
+    return t("severity.warning");
   }
 
-  return "Info";
+  return t("severity.info");
 }
 
 function getSeverityColors(severity: string): {
@@ -69,7 +70,7 @@ function escapeHtml(value: unknown): string {
 
 function formatDisplayValue(value: unknown): string {
   const serialized = JSON.stringify(value);
-  return escapeHtml(serialized ?? "missing");
+  return escapeHtml(serialized ?? t("common.missing"));
 }
 
 function formatProposalValue(
@@ -127,7 +128,7 @@ function renderProposal(
   ) {
     html += `
       <div>
-        <b>Current:</b> ${formatProposalValue(
+        <b>${escapeHtml(t("featureEditor.current"))}:</b> ${formatProposalValue(
           proposal.currentValue,
           proposal.displayCurrentValue
         )}
@@ -141,7 +142,7 @@ function renderProposal(
   ) {
     html += `
       <div>
-        <b>Suggested:</b> ${formatLinkedProposalValue(
+        <b>${escapeHtml(t("featureEditor.suggested"))}:</b> ${formatLinkedProposalValue(
           proposal.proposedValue,
           proposal.displayProposedValue,
           proposal.displayProposedValueUrl
@@ -166,14 +167,14 @@ function renderProposal(
           class="wmeph-row-apply-checkbox"
           data-proposal-id="${escapeHtml(proposal.id ?? "")}"
         />
-        Apply this fix
+        ${escapeHtml(t("featureEditor.applyThisFix"))}
       </label>
     `;
   } else {
     const manualText =
       proposal.actionType === "manual-only"
-        ? "Manual action required"
-        : "This suggestion is not applyable yet";
+        ? t("featureEditor.manualActionRequired")
+        : t("featureEditor.suggestionNotApplicableYet");
 
     html += `
       <div style="color:#888;margin-top:6px;">
@@ -211,7 +212,7 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   if (group.field) {
     html += `
       <div style="font-size:12px;color:#666;margin-bottom:4px;">
-        Field: ${escapeHtml(group.field)}
+        ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(group.field)}
       </div>
     `;
   }
@@ -228,7 +229,7 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
           class="wmeph-row-whitelist-issue"
           data-group-key="${escapeHtml(group.key)}"
         >
-          Ignore for this venue
+          ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
         </button>
       </div>
     `;
@@ -263,7 +264,7 @@ export function renderFeatureEditorAnalysis(
   ">
 
   <div style=" font-weight:600; margin-bottom:8px;">
-    Place Harmonizer
+    ${escapeHtml(t("featureEditor.title"))}
   </div>
 
   <div style="
@@ -300,21 +301,21 @@ export function renderFeatureEditorAnalysis(
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Place</b></div>
+      <div><b>${escapeHtml(t("featureEditor.place"))}</b></div>
       <div>${escapeHtml(placeName)}</div>
     </div>
   `;
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Chain</b></div>
-      <div>${escapeHtml(chainId ?? "None")}</div>
+      <div><b>${escapeHtml(t("featureEditor.chain"))}</b></div>
+      <div>${escapeHtml(chainId ?? t("common.none"))}</div>
     </div>
   `;
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Findings</b></div>
+      <div><b>${escapeHtml(t("featureEditor.findings"))}</b></div>
       <div>${issueGroups.length}</div>
     </div>
   `;
@@ -328,7 +329,7 @@ export function renderFeatureEditorAnalysis(
         background: #fff;
         color: green;
       ">
-        No findings
+        ${escapeHtml(t("featureEditor.noFindings"))}
       </div>
     `;
   } else {
@@ -343,7 +344,7 @@ export function renderFeatureEditorAnalysis(
     html += `
       <div style="margin-top:12px;">
         <button id="wmeph-row-apply-selected" type="button">
-          Apply selected fixes
+          ${escapeHtml(t("featureEditor.applySelectedFixes"))}
         </button>
       </div>
     `;

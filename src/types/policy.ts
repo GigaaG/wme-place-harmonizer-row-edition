@@ -1,5 +1,6 @@
 import type { GeometryPolicy, ServicePolicy } from "./chains";
 import type { AddressPolicy, PresenceRequirement } from "./address";
+import type { LocalizedTextList } from "./i18n";
 
 export interface EffectivePlacePolicy {
   geometry?: GeometryPolicy;
@@ -12,5 +13,5 @@ export interface EffectivePlacePolicy {
   externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;
-  editorNotes?: string[];
+  editorNotes?: LocalizedTextList;
 }

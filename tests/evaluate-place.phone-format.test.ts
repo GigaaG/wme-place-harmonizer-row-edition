@@ -18,8 +18,7 @@ const dutchPhoneFormatting: PhoneFormattingConfig = {
     "^0800 \\d+$",
     "^0900 \\d+$"
   ],
-  validationMessage:
-    "Phone number must use Dutch international format (+31 AA BBBBBBB, +31 AAA BBBBBB or +31 6 CBBBBBBB), or another country code in international +CC ... format, unless it is an 0800 or 0900 service number"
+  validationMessageKey: "config.validation.phone.nl"
 };
 
 function buildPlace(phone?: string): PlaceLike {

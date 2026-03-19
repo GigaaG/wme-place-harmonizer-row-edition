@@ -1,5 +1,6 @@
 import type { PlaceIssue } from "../types/issue";
 import type { PhoneFormattingConfig } from "../types/config";
+import { t } from "../i18n/runtime.ts";
 
 const DUTCH_TWO_DIGIT_AREA_CODES = new Set([
   "10",
@@ -225,7 +226,9 @@ export function buildPhoneFormatIssue(
 
   const message = hasText(formatting?.validationMessage)
     ? formatting.validationMessage.trim()
-    : "Phone number format is invalid";
+    : hasText(formatting?.validationMessageKey)
+      ? t(formatting.validationMessageKey.trim())
+      : t("issue.phone.format.invalid");
   const suggestedPhone = suggestPhoneFormat(phone, formatting);
 
   return {

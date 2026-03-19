@@ -1,5 +1,6 @@
 import type { PlaceIssue } from "../types/issue";
 import type { UrlFormattingConfig } from "../types/config";
+import { t } from "../i18n/runtime.ts";
 
 function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -97,7 +98,9 @@ export function buildUrlFormatIssue(
 
   const message = hasText(formatting?.validationMessage)
     ? formatting.validationMessage.trim()
-    : "URL format is invalid";
+    : hasText(formatting?.validationMessageKey)
+      ? t(formatting.validationMessageKey.trim())
+      : t("issue.url.format.invalid");
   const suggestedUrl = suggestUrlFormat(url, formatting);
 
   return {

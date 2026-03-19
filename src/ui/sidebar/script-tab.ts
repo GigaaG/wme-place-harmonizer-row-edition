@@ -1,8 +1,8 @@
 import { logger } from "../../logging/logger";
 import { getWmeSdk } from "../../integration/sdk/wme";
+import { t } from "../../i18n/runtime.ts";
 
 const SCRIPT_TAB_ID = "wmeph-row-script-tab";
-const SCRIPT_TAB_TITLE = "Place Harmonizer";
 
 let registeredTabPane: HTMLElement | null = null;
 
@@ -24,7 +24,7 @@ export async function ensureScriptSidebarTab(): Promise<HTMLElement | null> {
     });
 
     result.tabLabel.textContent = "PH";
-    result.tabLabel.title = SCRIPT_TAB_TITLE;
+    result.tabLabel.title = t("app.sidebarTabTitle");
 
     registeredTabPane = result.tabPane;
     registeredTabPane.innerHTML = "";

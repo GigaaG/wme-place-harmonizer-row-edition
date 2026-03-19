@@ -88,6 +88,19 @@ export function getCurrentEditorLockLevel(): number | undefined {
   return undefined;
 }
 
+export function getCurrentWmeLocale(): string | undefined {
+  const sdk = getWmeSdk();
+
+  try {
+    const locale = sdk?.Settings?.getLocale?.();
+    return typeof locale?.localeCode === "string"
+      ? locale.localeCode.trim() || undefined
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getWmeContext(): WmeContext {
   const sdk = getWmeSdk();
 

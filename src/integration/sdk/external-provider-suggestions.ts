@@ -5,6 +5,7 @@ import type { PlaceIssue } from "../../types/issue.ts";
 import type { PlaceProposal } from "../../types/proposal.ts";
 import type { ExternalProviderSuggestion } from "../../types/external-provider.ts";
 import { findExternalProviderEditorCandidates } from "./external-provider-editor.ts";
+import { t } from "../../i18n/runtime.ts";
 
 const MAX_EXTERNAL_PROVIDER_SUGGESTIONS = 1;
 const MIN_NAME_SCORE = 0.55;
@@ -767,12 +768,16 @@ function buildSuggestionReason(suggestion: ExternalProviderSuggestion): string {
   }
 
   if (typeof suggestion.distanceMeters === "number") {
-    details.push(`${suggestion.distanceMeters} m away`);
+    details.push(
+      t("proposal.externalProvider.reason.distanceAway", {
+        distanceMeters: suggestion.distanceMeters
+      })
+    );
   }
 
   return details.length > 0
     ? details.join(" | ")
-    : "Nearby match based on venue name";
+    : t("proposal.externalProvider.reason.nearbyName");
 }
 
 function buildSearchProposalId(issue: PlaceIssue, suffix: string): string {
@@ -814,10 +819,13 @@ export function buildExternalProviderSuggestionProposals(
       displayCurrentValue:
         currentExternalProviderIds.length > 0
           ? currentExternalProviderIds.join(", ")
-          : "missing",
+          : t("common.missing"),
       displayProposedValue:
         typeof suggestion.distanceMeters === "number"
-          ? `${suggestion.name} (${suggestion.distanceMeters} m)`
+          ? t("proposal.externalProvider.displayWithDistance", {
+              name: suggestion.name,
+              distanceMeters: suggestion.distanceMeters
+            })
           : suggestion.name,
       displayProposedValueUrl: buildGoogleMapsPlaceUrl(suggestion),
       externalProviderSearchText: suggestion.address
@@ -848,5 +856,8 @@ export function buildSuggestedExternalProviderIssueMessage(
     details.push(suggestion.address);
   }
 
-  return `${issue.message}. Suggested nearby match: ${details.join(" | ")}`;
+  return t("issue.externalProvider.suggestedNearbyMatch", {
+    issueMessage: issue.message,
+    details: details.join(" | ")
+  });
 }

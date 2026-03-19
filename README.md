@@ -16,6 +16,8 @@ The script is config-driven and uses a separate public data repository for manif
 
 - [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
 
+The UI language follows the user's WME locale via the WME SDK and falls back to the data-side default locale, then to English if no matching locale file exists.
+
 ### What you need
 
 - access to Waze Map Editor
@@ -54,6 +56,7 @@ You can also use the Highlighter / Scan tools to analyze visible venues on the m
 ### Stable and dev channels
 
 The production build defaults to the `stable` data channel. The development build defaults to the `dev` data channel.
+The active UI locale is independent from the data channel and is resolved from the WME locale first.
 
 ## For Developers
 
@@ -121,6 +124,8 @@ Useful starting points:
 This repository is the code side of a two-repository system. When behavior, contracts, or runtime data expectations change here, check whether the related data repository also needs updates:
 
 - [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
+
+That includes locale keys, translated locale files, the locale template, and locale-keyed `editorNotes` data when user-facing text changes.
 
 ### Release basics
 

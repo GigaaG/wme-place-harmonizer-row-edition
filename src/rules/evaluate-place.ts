@@ -10,6 +10,8 @@ import type {
 } from "../types/config";
 import { buildPhoneFormatIssue } from "./phone-format.ts";
 import { buildUrlFormatIssue } from "./url-format.ts";
+import { getRuntimeLocaleCode, t } from "../i18n/runtime.ts";
+import { resolveLocalizedTextList } from "../i18n/locale-utils.ts";
 
 function arraysEqual(a: string[] = [], b: string[] = []): boolean {
   if (a.length !== b.length) {
@@ -50,27 +52,13 @@ function normalizeAliases(aliases: string[] | undefined): string[] {
   );
 }
 
-function normalizeEditorNotes(notes: string[] | undefined): string[] {
-  if (!Array.isArray(notes)) {
-    return [];
-  }
-
-  return Array.from(
-    new Set(
-      notes
-        .map((note) => (typeof note === "string" ? normalizeWhitespace(note) : ""))
-        .filter((note) => note.length > 0)
-    )
-  );
-}
-
 const ADDRESS_FIELD_METADATA: Array<{
   key: keyof AddressPolicy;
-  label: string;
+  labelKey: string;
 }> = [
-  { key: "city", label: "city" },
-  { key: "street", label: "street name" },
-  { key: "houseNumber", label: "house number" }
+  { key: "city", labelKey: "field.address.city" },
+  { key: "street", labelKey: "field.address.street" },
+  { key: "houseNumber", labelKey: "field.address.houseNumber" }
 ];
 
 function hasText(value: unknown): value is string {
@@ -175,11 +163,12 @@ function buildPresenceIssue(params: {
 function pushAddressIssue(params: {
   issues: PlaceIssue[];
   fieldKey: keyof AddressPolicy;
-  label: string;
+  labelKey: string;
   requirement: PresenceRequirement;
   currentValue: string | undefined;
 }): void {
-  const { issues, fieldKey, label, requirement, currentValue } = params;
+  const { issues, fieldKey, labelKey, requirement, currentValue } = params;
+  const label = t(labelKey);
   const issue = buildPresenceIssue({
     field: `address.${fieldKey}`,
     rulePrefix: `address.${fieldKey}`,
@@ -187,10 +176,10 @@ function pushAddressIssue(params: {
     hasValue: hasText(currentValue),
     currentValue,
     messages: {
-      required: `Address must include ${label}`,
-      recommended: `Address should include ${label}`,
-      discouraged: `Address should not include ${label}`,
-      forbidden: `Address must not include ${label}`
+      required: t("issue.address.required", { field: label }),
+      recommended: t("issue.address.recommended", { field: label }),
+      discouraged: t("issue.address.discouraged", { field: label }),
+      forbidden: t("issue.address.forbidden", { field: label })
     }
   });
 
@@ -211,8 +200,15 @@ export function evaluatePlace(
 ): PlaceIssue[] {
   const issues: PlaceIssue[] = [];
   const aliases = normalizeAliases(place.aliases);
-  const categoryEditorNotes = normalizeEditorNotes(policy.editorNotes);
-  const chainEditorNotes = normalizeEditorNotes(chain?.editorNotes);
+  const runtimeLocaleCode = getRuntimeLocaleCode();
+  const categoryEditorNotes = resolveLocalizedTextList(
+    policy.editorNotes,
+    runtimeLocaleCode
+  );
+  const chainEditorNotes = resolveLocalizedTextList(
+    chain?.editorNotes,
+    runtimeLocaleCode
+  );
   const externalProviderIds = normalizeExternalProviderIds(
     place.externalProviderIds
   );
@@ -246,7 +242,7 @@ export function evaluatePlace(
     issues.push({
       field: "name",
       severity: "warning",
-      message: `Name should be "${expectedName}"`,
+      message: t("issue.name.shouldBe", { expectedName }),
       currentValue: place.name,
       expectedValue: expectedName,
       ruleId: "nameNormalization"
@@ -264,7 +260,9 @@ export function evaluatePlace(
       issues.push({
         field: "name",
         severity: cityInVenueNameSeverity,
-        message: `Venue name should not include city name "${place.address.city}"`,
+        message: t("issue.name.cityShouldBeExcluded", {
+          cityName: place.address.city
+        }),
         currentValue: place.name,
         expectedValue: suggestedName,
         ruleId: "cityInVenueName"
@@ -282,7 +280,9 @@ export function evaluatePlace(
         issues.push({
           field: "geometry",
           severity: "error",
-          message: `Geometry must be ${policy.geometry.required}`,
+          message: t("issue.geometry.required", {
+            geometry: policy.geometry.required
+          }),
           currentValue: place.geometry,
           expectedValue: policy.geometry.required,
           ruleId: "geometry.required"
@@ -295,7 +295,9 @@ export function evaluatePlace(
       issues.push({
         field: "geometry",
         severity: "warning",
-        message: `Geometry should be ${policy.geometry.recommended}`,
+        message: t("issue.geometry.recommended", {
+          geometry: policy.geometry.recommended
+        }),
         currentValue: place.geometry,
         expectedValue: policy.geometry.recommended,
         ruleId: "geometry.recommended"
@@ -315,7 +317,9 @@ export function evaluatePlace(
     issues.push({
       field: "lockLevel",
       severity: "warning",
-      message: `Lock level should be at least ${policy.lockLevel}`,
+      message: t("issue.lockLevel.minimum", {
+        lockLevel: policy.lockLevel
+      }),
       currentValue: place.lockLevel,
       expectedValue: policy.lockLevel,
       ruleId: "lockLevelRecommendation"
@@ -334,10 +338,10 @@ export function evaluatePlace(
       hasValue: hasText(place.phone),
       currentValue: place.phone,
       messages: {
-        required: "Phone number is required",
-        recommended: "Phone number is recommended",
-        discouraged: "Phone number should not be provided",
-        forbidden: "Phone number must not be provided"
+        required: t("issue.phone.required"),
+        recommended: t("issue.phone.recommended"),
+        discouraged: t("issue.phone.discouraged"),
+        forbidden: t("issue.phone.forbidden")
       }
     });
 
@@ -366,10 +370,10 @@ export function evaluatePlace(
       hasValue: hasText(place.url),
       currentValue: place.url,
       messages: {
-        required: "URL is required",
-        recommended: "URL is recommended",
-        discouraged: "URL should not be provided",
-        forbidden: "URL must not be provided"
+        required: t("issue.url.required"),
+        recommended: t("issue.url.recommended"),
+        discouraged: t("issue.url.discouraged"),
+        forbidden: t("issue.url.forbidden")
       }
     });
 
@@ -391,7 +395,7 @@ export function evaluatePlace(
     issues.push({
       field: "url",
       severity: "warning",
-      message: `URL should be "${expectedUrl}"`,
+      message: t("issue.url.shouldBe", { expectedUrl }),
       currentValue: place.url,
       expectedValue: expectedUrl,
       ruleId: "urlNormalization"
@@ -410,10 +414,10 @@ export function evaluatePlace(
       hasValue: Boolean(place.openingHours && place.openingHours.length > 0),
       currentValue: place.openingHours,
       messages: {
-        required: "Opening hours are required",
-        recommended: "Opening hours are recommended",
-        discouraged: "Opening hours should not be provided",
-        forbidden: "Opening hours must not be provided"
+        required: t("issue.openingHours.required"),
+        recommended: t("issue.openingHours.recommended"),
+        discouraged: t("issue.openingHours.discouraged"),
+        forbidden: t("issue.openingHours.forbidden")
       }
     });
 
@@ -439,10 +443,10 @@ export function evaluatePlace(
       hasValue: navigationPointCount > 0,
       currentValue: navigationPointCount,
       messages: {
-        required: "Polygon venues must have at least one navigation point",
-        recommended: "Polygon venues should have at least one navigation point",
-        discouraged: "Polygon venues should not have navigation points",
-        forbidden: "Polygon venues must not have navigation points"
+        required: t("issue.navigationPoints.required"),
+        recommended: t("issue.navigationPoints.recommended"),
+        discouraged: t("issue.navigationPoints.discouraged"),
+        forbidden: t("issue.navigationPoints.forbidden")
       }
     });
 
@@ -462,7 +466,7 @@ export function evaluatePlace(
       issues.push({
         field: "openingHours",
         severity: "warning",
-        message: "Opening hours are missing but the chain provides a template",
+        message: t("issue.openingHours.templateMissing"),
         currentValue: currentOpeningHours,
         expectedValue: expectedOpeningHours,
         ruleId: "openingHours.template"
@@ -475,7 +479,7 @@ export function evaluatePlace(
         issues.push({
           field: "openingHours",
           severity: "warning",
-          message: "Opening hours differ from the chain template",
+          message: t("issue.openingHours.templateDifferent"),
           currentValue: currentOpeningHours,
           expectedValue: expectedOpeningHours,
           ruleId: "openingHours.template"
@@ -502,9 +506,9 @@ export function evaluatePlace(
     issues.push({
       field: "aliases",
       severity: "warning",
-      message: `Suggested alias missing: ${requiredAlias}`,
+      message: t("issue.alias.requiredMissing", { alias: requiredAlias }),
       groupKey: "aliases.suggested",
-      groupMessage: "Suggested aliases missing",
+      groupMessage: t("issue.alias.groupMissing"),
       currentValue: aliases,
       expectedValue: requiredAlias,
       ruleId: `aliases.suggested.${requiredAlias}`
@@ -519,9 +523,9 @@ export function evaluatePlace(
     issues.push({
       field: "aliases",
       severity: "info",
-      message: `Optional alias suggestion: ${optionalAlias}`,
+      message: t("issue.alias.optionalSuggestion", { alias: optionalAlias }),
       groupKey: "aliases.suggested",
-      groupMessage: "Suggested aliases missing",
+      groupMessage: t("issue.alias.groupMissing"),
       currentValue: aliases,
       expectedValue: optionalAlias,
       ruleId: `aliases.optional.${optionalAlias}`
@@ -540,10 +544,10 @@ export function evaluatePlace(
       hasValue: hasExternalProviders,
       currentValue: externalProviderIds,
       messages: {
-        required: "At least one external provider id is required",
-        recommended: "At least one external provider id is recommended",
-        discouraged: "External provider ids should not be provided",
-        forbidden: "Venue must not have external provider ids"
+        required: t("issue.externalProvider.required"),
+        recommended: t("issue.externalProvider.recommended"),
+        discouraged: t("issue.externalProvider.discouraged"),
+        forbidden: t("issue.externalProvider.forbidden")
       }
     });
 
@@ -564,7 +568,7 @@ export function evaluatePlace(
     issues.push({
       field: "externalProviderIds",
       severity: "warning",
-      message: "External provider ids differ from the chain standard",
+      message: t("issue.externalProvider.chainMismatch"),
       currentValue: externalProviderIds,
       expectedValue: expectedExternalProviderIds,
       ruleId: "externalProvider.match"
@@ -576,7 +580,7 @@ export function evaluatePlace(
   //
 
   if (policy.address) {
-    for (const { key, label } of ADDRESS_FIELD_METADATA) {
+    for (const { key, labelKey } of ADDRESS_FIELD_METADATA) {
       const requirement = policy.address[key];
 
       if (!requirement) {
@@ -586,7 +590,7 @@ export function evaluatePlace(
       pushAddressIssue({
         issues,
         fieldKey: key,
-        label,
+        labelKey,
         requirement,
         currentValue: place.address?.[key]
       });
@@ -606,9 +610,9 @@ export function evaluatePlace(
           issues.push({
             field: "services",
             severity: "error",
-            message: `Required service missing: ${required}`,
+            message: t("issue.service.requiredMissing", { service: required }),
             groupKey: "services.required",
-            groupMessage: "Required services missing",
+            groupMessage: t("issue.service.groupRequiredMissing"),
             currentValue: services,
             expectedValue: required,
             ruleId: `services.required.${required}`
@@ -623,9 +627,11 @@ export function evaluatePlace(
           issues.push({
             field: "services",
             severity: "warning",
-            message: `Recommended service missing: ${recommended}`,
+            message: t("issue.service.recommendedMissing", {
+              service: recommended
+            }),
             groupKey: "services.recommended",
-            groupMessage: "Recommended services missing",
+            groupMessage: t("issue.service.groupRecommendedMissing"),
             currentValue: services,
             expectedValue: recommended,
             ruleId: `services.recommended.${recommended}`
@@ -640,9 +646,11 @@ export function evaluatePlace(
           issues.push({
             field: "services",
             severity: "warning",
-            message: `Discouraged service present: ${discouraged}`,
+            message: t("issue.service.discouragedPresent", {
+              service: discouraged
+            }),
             groupKey: "services.discouraged",
-            groupMessage: "Discouraged services present",
+            groupMessage: t("issue.service.groupDiscouragedPresent"),
             currentValue: services,
             expectedValue: discouraged,
             ruleId: `services.discouraged.${discouraged}`
@@ -657,9 +665,11 @@ export function evaluatePlace(
           issues.push({
             field: "services",
             severity: "error",
-            message: `Forbidden service present: ${forbidden}`,
+            message: t("issue.service.forbiddenPresent", {
+              service: forbidden
+            }),
             groupKey: "services.forbidden",
-            groupMessage: "Forbidden services present",
+            groupMessage: t("issue.service.groupForbiddenPresent"),
             currentValue: services,
             expectedValue: forbidden,
             ruleId: `services.forbidden.${forbidden}`

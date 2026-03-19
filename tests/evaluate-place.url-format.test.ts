@@ -17,8 +17,7 @@ const dutchUrlFormatting: UrlFormattingConfig = {
     "https://example.com/en",
     "https://info.example.co.uk?lang=en"
   ],
-  validationMessage:
-    "URL must include http:// or https:// and use a valid hostname, optionally with a port, path, query or fragment"
+  validationMessageKey: "config.validation.url.generic"
 };
 
 function buildPlace(url?: string): PlaceLike {

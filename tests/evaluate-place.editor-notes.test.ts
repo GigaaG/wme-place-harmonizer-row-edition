@@ -21,9 +21,9 @@ runTest("emits informational editor notes from the matched chain", () => {
   const chain: ChainRecord = {
     id: "example-chain",
     canonicalName: "Example Chain",
-    editorNotes: [
-      "This chain often shares parking with adjacent businesses."
-    ]
+    editorNotes: {
+      en: ["This chain often shares parking with adjacent businesses."]
+    }
   };
 
   const issues = evaluatePlace(place, {}, chain);

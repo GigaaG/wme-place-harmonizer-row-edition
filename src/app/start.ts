@@ -16,6 +16,7 @@ import {
   waitForWmeSdkReady,
   waitForInitialMapDataLoaded,
   getCurrentEditorLockLevel,
+  getCurrentWmeLocale,
   getWmeSdk
 } from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
@@ -62,6 +63,8 @@ import {
   filterWhitelistedAnalysis,
   upsertWhitelistEntries
 } from "../whitelist/manager";
+import { loadBestAvailableLocale } from "../i18n/locale-loader.ts";
+import { setRuntimeLocale, t } from "../i18n/runtime.ts";
 
 //
 // Runtime containers
@@ -319,8 +322,16 @@ function findMissingExternalProviderIssue(
   );
 }
 
+function readConfigDefaultLocale(config: any): string | undefined {
+  return typeof config?.defaults?.locale === "string"
+    ? config.defaults.locale
+    : undefined;
+}
+
 function formatAnalysisCountLabel(issues: PlaceIssue[]): string {
-  const findingsLabel = `${issues.length} finding(s)`;
+  const findingsLabel = t("status.analysisCount.findings", {
+    count: issues.length
+  });
   const warningOrErrorCount = issues.filter(
     (issue) => issue.severity === "warning" || issue.severity === "error"
   ).length;
@@ -330,7 +341,10 @@ function formatAnalysisCountLabel(issues: PlaceIssue[]): string {
   }
 
   const infoCount = issues.length - warningOrErrorCount;
-  return `${findingsLabel}, including ${infoCount} info`;
+  return t("status.analysisCount.findingsWithInfo", {
+    count: issues.length,
+    infoCount
+  });
 }
 
 function getCurrentWhitelistRuntimeSnapshot():
@@ -391,6 +405,27 @@ function renderLatestVenueAnalysis(): void {
   );
   wireApplyButton();
   wireWhitelistButtons();
+}
+
+async function refreshRuntimeLocale(): Promise<void> {
+  if (!runtimeManifest || !runtimeConfig) {
+    return;
+  }
+
+  try {
+    const localeFile = await loadBestAvailableLocale({
+      manifest: runtimeManifest,
+      preferredLocale: getCurrentWmeLocale(),
+      fallbackLocale: readConfigDefaultLocale(runtimeConfig)
+    });
+
+    setRuntimeLocale(localeFile);
+    logger.info(`Runtime locale loaded: ${localeFile.locale}`);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown locale loading error";
+    logger.warn(`Runtime locale could not be loaded: ${message}`);
+  }
 }
 
 function applyExternalProviderSuggestionToIssues(
@@ -505,6 +540,7 @@ async function loadRuntimeDataForCountry(country?: string): Promise<void> {
   runtimeConfig = await resolveRuntimeConfig(normalizedCountry);
   runtimeChains = await resolveRuntimeChains(normalizedCountry);
   runtimeCountry = normalizedCountry;
+  await refreshRuntimeLocale();
 }
 
 async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
@@ -527,8 +563,8 @@ async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
       ...sidebarState,
       autoScanVisibleVenues: enabled,
       lastStatus: enabled
-        ? "Auto scan enabled"
-        : "Auto scan disabled"
+        ? t("status.autoScanEnabled")
+        : t("status.autoScanDisabled")
     });
 
     await rerenderSidebar();
@@ -604,10 +640,12 @@ async function scanVisibleVenuesFromMap(
     keepExistingOnEmpty: trigger === "auto"
   });
 
-  let statusText = `Scanned ${summary.total} visible venue(s)`;
+  let statusText = t("status.scannedVisibleVenues", {
+    count: summary.total
+  });
 
   if (highlightRenderResult.keptExisting) {
-    statusText = "Auto scan found no drawable venues; keeping previous highlights";
+    statusText = t("status.autoScanKeptHighlights");
   }
 
   const sidebarState = getSidebarDebugState();
@@ -667,7 +705,7 @@ async function reloadData(): Promise<void> {
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
       runtimeChainsCount: runtimeChains.items.length,
-      lastStatus: "Runtime data reloaded"
+      lastStatus: t("status.runtimeDataReloaded")
     });
 
     const updated = getSidebarDebugState();
@@ -748,19 +786,27 @@ function wireApplyButton(): void {
       if (result.errors.length > 0) {
         statusMessage = {
           kind: "error" as const,
-          text: `Failed to apply some fixes (${result.errors.length} error(s))`
+          text: t("status.apply.failedSomeFixes", {
+            errorCount: result.errors.length
+          })
         };
       } else if (result.applied > 0) {
         statusMessage = {
           kind: "success" as const,
           text: includesExternalProviderProposal
-            ? `Applied ${result.applied} fix(es), skipped ${result.skipped}. External provider selection was sent through the editor autocomplete.`
-            : `Applied ${result.applied} fix(es), skipped ${result.skipped}`
+            ? t("status.apply.appliedWithExternalProvider", {
+                appliedCount: result.applied,
+                skippedCount: result.skipped
+              })
+            : t("status.apply.applied", {
+                appliedCount: result.applied,
+                skippedCount: result.skipped
+              })
         };
       } else {
         statusMessage = {
           kind: "warning" as const,
-          text: "No supported fixes were selected"
+          text: t("status.apply.noneSelected")
         };
       }
 
@@ -898,8 +944,10 @@ function wireWhitelistButtons(): void {
             kind: "success",
             text:
               changedCount > 0
-                ? `Ignored ${entries.length} finding(s) for this venue until the active config or chains version changes`
-                : "These findings were already ignored for this venue"
+                ? t("status.whitelist.ignored", {
+                    count: entries.length
+                  })
+                : t("status.whitelist.alreadyIgnored")
           }
         });
 
@@ -1003,7 +1051,10 @@ async function analyzeVenue(params: {
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
       runtimeChainsCount: runtimeChains.items.length,
-      lastStatus: `Analyzed venue: ${place.name} (${formatAnalysisCountLabel(filteredAnalysis.issues)})`
+      lastStatus: t("status.analyzedVenue", {
+        placeName: place.name,
+        findings: formatAnalysisCountLabel(filteredAnalysis.issues)
+      })
     });
 
     const updatedSidebarState = getSidebarDebugState();
@@ -1105,7 +1156,7 @@ export async function startApplication(): Promise<void> {
   );
 
   setSidebarDebugState({
-    scriptName: "WME Place Harmonizer ROW Edition",
+    scriptName: t("app.name"),
     dataChannel: settings.dataChannel,
     manifestVersion: manifest.version,
     manifestRevision: manifest.dataRevision,
@@ -1113,7 +1164,7 @@ export async function startApplication(): Promise<void> {
     runtimeConfigVersion: runtimeConfig.version,
     runtimeChainsId: runtimeChains.id,
     runtimeChainsCount: runtimeChains.items.length,
-    lastStatus: "Ready",
+    lastStatus: t("status.ready"),
     highlightsEnabled: true,
     autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true
   });
@@ -1166,7 +1217,7 @@ export async function startApplication(): Promise<void> {
       if (sidebarState) {
         setSidebarDebugState({
           ...sidebarState,
-          lastStatus: "Selection is not a venue"
+          lastStatus: t("status.selectionNotVenue")
         });
 
         const updatedSidebarState = getSidebarDebugState();

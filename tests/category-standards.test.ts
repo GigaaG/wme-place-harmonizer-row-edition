@@ -22,9 +22,9 @@ const runtimeConfig: HarmonizerConfig = {
       navigationPoints: "required"
     },
     BUS_STATION: {
-      editorNotes: [
-        "In the Netherlands, bus stops are not considered bus stations."
-      ]
+      editorNotes: {
+        en: ["In the Netherlands, bus stops are not considered bus stations."]
+      }
     }
   }
 };
@@ -54,7 +54,9 @@ const hierarchyConfig: HarmonizerConfig = {
         street: "required",
         houseNumber: "recommended"
       },
-      editorNotes: ["Parent note"]
+      editorNotes: {
+        en: ["Parent note"]
+      }
     },
     CHILD_CATEGORY: {
       geometry: {
@@ -76,7 +78,9 @@ const hierarchyConfig: HarmonizerConfig = {
         street: "discouraged",
         houseNumber: "forbidden"
       },
-      editorNotes: ["Child note"]
+      editorNotes: {
+        en: ["Child note"]
+      }
     }
   }
 };
@@ -370,6 +374,8 @@ runTest("subcategory overrides main category across overlapping policy fields", 
       street: "discouraged",
       houseNumber: "forbidden"
     },
-    editorNotes: ["Parent note", "Child note"]
+    editorNotes: {
+      en: ["Parent note", "Child note"]
+    }
   });
 });

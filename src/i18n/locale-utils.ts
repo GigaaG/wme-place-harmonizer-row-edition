@@ -9,7 +9,7 @@ export function normalizeLocaleCode(locale: string | undefined): string | undefi
     return undefined;
   }
 
-  const normalized = locale.trim().replaceAll("_", "-").toLowerCase();
+  const normalized = locale.trim().replace(/_/g, "-").toLowerCase();
   return normalized.length > 0 ? normalized : undefined;
 }
 

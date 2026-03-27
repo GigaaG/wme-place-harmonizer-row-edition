@@ -363,8 +363,8 @@ function tokenize(value: string): string[] {
 
 function compactNormalizedName(value: string): string {
   return normalizeText(value)
-    .replaceAll(" ", "")
-    .replaceAll("'", "");
+    .replace(/ /g, "")
+    .replace(/'/g, "");
 }
 
 export function scoreExternalProviderName(

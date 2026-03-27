@@ -83,12 +83,17 @@ runTest("flags linked providers when the Google name materially differs", () => 
 
   assert.equal(finding.issue.ruleId, "externalProvider.validation.nameMismatch");
   assert.equal(finding.issue.severity, "info");
+  assert.equal(finding.issue.field, "name");
   assert.equal(
     finding.issue.message,
     "Linked Google Place name differs: WME \"Shell\", Google \"BP Damrak\""
   );
   assert.equal(finding.proposal.displayCurrentValue, "Shell");
   assert.equal(finding.proposal.currentValue, "Shell");
+  assert.equal(finding.proposal.field, "name");
+  assert.equal(finding.proposal.proposedValue, "BP Damrak");
+  assert.equal(finding.proposal.isApplySupported, true);
+  assert.equal(finding.proposal.actionType, "set-field");
 });
 
 runTest("flags linked providers with large location drift", () => {
@@ -149,11 +154,150 @@ runTest("flags linked providers when Google opening hours differ", () => {
     "Linked Google Place opening hours differ from WME: Starbucks Central"
   );
   assert.equal(finding.issue.severity, "info");
+  assert.equal(finding.issue.field, "openingHours");
   assert.equal(
     finding.proposal.displayCurrentValue,
     "1:09:00-18:00, 2:09:00-18:00, 3:09:00-18:00, 4:09:00-18:00, 5:09:00-18:00"
   );
   assert.equal(finding.proposal.displayProposedValue, "Mon-Fri: 8:00 AM-6:00 PM");
+  assert.equal(finding.proposal.field, "openingHours");
+  assert.equal(finding.proposal.isApplySupported, true);
+  assert.equal(finding.proposal.actionType, "set-field");
+});
+
+runTest("builds applyable opening hours proposals when Google hours can be mapped", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-apply",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [],
+      googleOpeningHours: [
+        "1:08:00-18:00",
+        "2:08:00-18:00",
+        "3:08:00-18:00",
+        "4:08:00-18:00",
+        "5:08:00-18:00"
+      ],
+      googleOpeningHoursValue: [
+        {
+          days: [1, 2, 3, 4, 5],
+          fromHour: "08:00",
+          toHour: "18:00"
+        }
+      ],
+      googleOpeningHoursDisplay: "Mon-Fri: 8:00 AM-6:00 PM"
+    })
+  );
+
+  assert.equal(finding.proposal.isApplySupported, true);
+  assert.equal(finding.proposal.actionType, "set-field");
+  assert.deepEqual(finding.proposal.proposedValue, [
+    {
+      days: [1, 2, 3, 4, 5],
+      fromHour: "08:00",
+      toHour: "18:00"
+    }
+  ]);
+});
+
+runTest("converts 24-hour Google schedules into applyable WME opening-hours payloads", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-24h",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [],
+      googleOpeningHours: [
+        "0:00:00-24:00",
+        "1:00:00-24:00",
+        "2:00:00-24:00",
+        "3:00:00-24:00",
+        "4:00:00-24:00",
+        "5:00:00-24:00",
+        "6:00:00-24:00"
+      ],
+      googleOpeningHoursDisplay: "Open 24 hours"
+    })
+  );
+
+  assert.equal(finding.proposal.isApplySupported, true);
+  assert.equal(finding.proposal.actionType, "set-field");
+  assert.equal(finding.proposal.displayProposedValue, "24/7");
+  assert.deepEqual(finding.proposal.proposedValue, [
+    {
+      days: [0, 1, 2, 3, 4, 5, 6],
+      fromHour: "00:00",
+      toHour: "00:00"
+    }
+  ]);
+});
+
+runTest("treats WME 00:00-00:00 as 24-hour opening hours during comparison", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-hours-247-current",
+    venueName: "Starbucks",
+    placeName: "Starbucks Central",
+    currentOpeningHours: [
+      {
+        days: [0, 1, 2, 3, 4, 5, 6],
+        fromHour: "00:00",
+        toHour: "00:00"
+      }
+    ],
+    googleOpeningHours: [
+      "0:00:00-24:00",
+      "1:00:00-24:00",
+      "2:00:00-24:00",
+      "3:00:00-24:00",
+      "4:00:00-24:00",
+      "5:00:00-24:00",
+      "6:00:00-24:00"
+    ],
+    googleOpeningHoursDisplay: "Open 24 hours"
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId ===
+        "externalProvider.validation.openingHoursDifferent"
+    ),
+    false
+  );
+});
+
+runTest("renders WME 24/7 opening hours as a compact label", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-current-247-display",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [
+        {
+          days: [0, 1, 2, 3, 4, 5, 6],
+          fromHour: "00:00",
+          toHour: "00:00"
+        }
+      ],
+      googleOpeningHours: [
+        "0:08:00-23:00",
+        "1:08:00-23:00",
+        "2:08:00-23:00",
+        "3:08:00-23:00",
+        "4:08:00-23:00",
+        "5:08:00-23:00",
+        "6:08:00-23:00"
+      ],
+      googleOpeningHoursDisplay:
+        "maandag: 08:00-23:00 | dinsdag: 08:00-23:00 | woensdag: 08:00-23:00 | donderdag: 08:00-23:00 | vrijdag: 08:00-23:00 | zaterdag: 08:00-23:00 | zondag: 08:00-23:00"
+    })
+  );
+
+  assert.equal(finding.proposal.displayCurrentValue, "24/7");
 });
 
 runTest("shows missing as the current value when WME opening hours are empty", () => {
@@ -199,6 +343,7 @@ runTest("flags linked providers when Google place types do not match mapped WME 
     "Linked Google Place categories do not match the WME category mapping: Shell Damrak"
   );
   assert.equal(finding.issue.severity, "info");
+  assert.equal(finding.issue.field, "categories");
   assert.equal(finding.proposal.displayCurrentValue, "GAS_STATION");
   assert.match(finding.proposal.reason, /restaurant/);
   assert.match(finding.proposal.reason, /gas_station/);
@@ -270,4 +415,28 @@ runTest("honors per-check Google validation settings", () => {
     findings[0].issue.ruleId,
     "externalProvider.validation.locationDrift"
   );
+});
+
+runTest("honors config-driven severities for Google validation findings", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings(
+      {
+        providerId: "provider-hours-severity",
+        venueName: "Starbucks",
+        placeName: "Starbucks Central",
+        currentOpeningHours: [],
+        googleOpeningHours: ["1:08:00-18:00"],
+        googleOpeningHoursDisplay: "Mon: 8:00 AM-6:00 PM"
+      },
+      undefined,
+      {
+        severity: {
+          openingHours: "warning"
+        }
+      }
+    )
+  );
+
+  assert.equal(finding.issue.severity, "warning");
 });

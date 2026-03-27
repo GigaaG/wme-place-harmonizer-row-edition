@@ -5,6 +5,7 @@ import type {
   RuntimeRulesConfig,
   SupportedConfigType
 } from "../types/config.ts";
+import type { IssueSeverity } from "../types/issue.ts";
 import { GOOGLE_MAPS_VALIDATION_CHECK_KEYS } from "../types/settings.ts";
 import { getConfigUrl } from "./config-source.ts";
 
@@ -77,22 +78,40 @@ function validateGoogleMapsValidationConfig(
     );
   }
 
-  if (value.checks === undefined) {
+  if (value.checks !== undefined) {
+    if (!isPlainObject(value.checks)) {
+      throw new Error(
+        `Config googleMapsValidation.checks must be an object: ${path}`
+      );
+    }
+
+    for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
+      const checkValue = value.checks[checkKey];
+
+      if (checkValue !== undefined && typeof checkValue !== "boolean") {
+        throw new Error(
+          `Config googleMapsValidation.checks.${checkKey} must be a boolean: ${path}`
+        );
+      }
+    }
+  }
+
+  if (value.severity === undefined) {
     return;
   }
 
-  if (!isPlainObject(value.checks)) {
+  if (!isPlainObject(value.severity)) {
     throw new Error(
-      `Config googleMapsValidation.checks must be an object: ${path}`
+      `Config googleMapsValidation.severity must be an object: ${path}`
     );
   }
 
   for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
-    const checkValue = value.checks[checkKey];
+    const severityValue = value.severity[checkKey] as IssueSeverity | undefined;
 
-    if (checkValue !== undefined && typeof checkValue !== "boolean") {
+    if (severityValue !== undefined && !isValidSeverity(severityValue)) {
       throw new Error(
-        `Config googleMapsValidation.checks.${checkKey} must be a boolean: ${path}`
+        `Config googleMapsValidation.severity.${checkKey} must be a valid severity: ${path}`
       );
     }
   }

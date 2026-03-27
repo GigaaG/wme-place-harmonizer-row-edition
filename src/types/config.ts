@@ -1,7 +1,11 @@
 import type { GeometryType } from "./chains";
 import type { AddressPolicy, PresenceRequirement } from "./address";
 import type { LocalizedTextList } from "./i18n";
-import type { GoogleMapsValidationChecks } from "./settings";
+import type { IssueSeverity } from "./issue";
+import type {
+  GoogleMapsValidationCheckKey,
+  GoogleMapsValidationChecks
+} from "./settings";
  
 // This type intentionally models the subset of config that the current
 // userscript runtime actively consumes.
@@ -76,6 +80,7 @@ export interface RuntimeRulesConfig {
 export interface GoogleMapsValidationConfig {
   enabled?: boolean;
   checks?: Partial<GoogleMapsValidationChecks>;
+  severity?: Partial<Record<GoogleMapsValidationCheckKey, IssueSeverity>>;
 }
 
 export interface HarmonizerConfig {

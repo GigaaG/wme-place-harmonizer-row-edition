@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { validateConfigFile } from "../src/config/config-loader.ts";
 import {
   getEffectiveGoogleMapsValidationSettings,
-  resolveGoogleMapsValidationAvailability
+  resolveGoogleMapsValidationAvailability,
+  resolveGoogleMapsValidationSeverities
 } from "../src/settings/google-maps-validation-policy.ts";
 import type { GoogleMapsValidationSettings } from "../src/types/settings.ts";
 
@@ -79,6 +80,24 @@ runTest("config can disable Google validation entirely", () => {
   }
 });
 
+runTest("config can override Google validation severities", () => {
+  const severities = resolveGoogleMapsValidationSeverities({
+    id: "nl",
+    type: "country-config",
+    version: 1,
+    googleMapsValidation: {
+      severity: {
+        nameMismatch: "warning",
+        openingHours: "error"
+      }
+    }
+  });
+
+  assert.equal(severities.notFound, "warning");
+  assert.equal(severities.nameMismatch, "warning");
+  assert.equal(severities.openingHours, "error");
+});
+
 runTest("config loader rejects invalid Google validation config", () => {
   assert.throws(
     () =>
@@ -96,5 +115,25 @@ runTest("config loader rejects invalid Google validation config", () => {
         "config/countries/nl.json"
       ),
     /Config googleMapsValidation\.checks\.openingHours must be a boolean/
+  );
+});
+
+runTest("config loader rejects invalid Google validation severity values", () => {
+  assert.throws(
+    () =>
+      validateConfigFile(
+        {
+          id: "nl",
+          type: "country-config",
+          version: 1,
+          googleMapsValidation: {
+            severity: {
+              openingHours: "urgent"
+            }
+          }
+        },
+        "config/countries/nl.json"
+      ),
+    /Config googleMapsValidation\.severity\.openingHours must be a valid severity/
   );
 });

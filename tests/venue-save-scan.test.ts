@@ -49,8 +49,11 @@ await runTest("rescans after venue save events", async () => {
     window?: any;
     unsafeWindow?: any;
   };
-  const previousWindow = hostWindow.window;
   const previousUnsafeWindow = hostWindow.unsafeWindow;
+  const targetWindow = hostWindow.window ?? (hostWindow.window = {});
+  const previousGetWmeSdk = targetWindow.getWmeSdk;
+  const previousClearTimeout = targetWindow.clearTimeout;
+  const previousSetTimeout = targetWindow.setTimeout;
   let savedHandler:
     | ((event: { dataModelName?: string; objectIds?: Array<string | number> | null }) => void)
     | undefined;
@@ -79,11 +82,9 @@ await runTest("rescans after venue save events", async () => {
     }
   };
 
-  hostWindow.window = {
-    clearTimeout: globalThis.clearTimeout.bind(globalThis),
-    setTimeout: globalThis.setTimeout.bind(globalThis),
-    getWmeSdk: () => sdk
-  };
+  targetWindow.clearTimeout = globalThis.clearTimeout.bind(globalThis);
+  targetWindow.setTimeout = globalThis.setTimeout.bind(globalThis);
+  targetWindow.getWmeSdk = () => sdk;
   hostWindow.unsafeWindow = undefined;
   resetVenueSaveScanListenerForTests();
 
@@ -112,7 +113,24 @@ await runTest("rescans after venue save events", async () => {
     assert.equal(scanCount, 1);
   } finally {
     resetVenueSaveScanListenerForTests();
-    hostWindow.window = previousWindow;
+    if (previousGetWmeSdk === undefined) {
+      delete targetWindow.getWmeSdk;
+    } else {
+      targetWindow.getWmeSdk = previousGetWmeSdk;
+    }
+
+    if (previousClearTimeout === undefined) {
+      delete targetWindow.clearTimeout;
+    } else {
+      targetWindow.clearTimeout = previousClearTimeout;
+    }
+
+    if (previousSetTimeout === undefined) {
+      delete targetWindow.setTimeout;
+    } else {
+      targetWindow.setTimeout = previousSetTimeout;
+    }
+
     hostWindow.unsafeWindow = previousUnsafeWindow;
   }
 });

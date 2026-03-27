@@ -68,8 +68,9 @@ await runTest(
       window?: any;
       unsafeWindow?: any;
     };
-    const previousWindow = hostWindow.window;
     const previousUnsafeWindow = hostWindow.unsafeWindow;
+    const targetWindow = hostWindow.window ?? (hostWindow.window = {});
+    const previousGetWmeSdk = targetWindow.getWmeSdk;
     let updateArgs: Record<string, unknown> | undefined;
 
     const geometryProposal: PlaceProposal = {
@@ -113,9 +114,7 @@ await runTest(
       }
     };
 
-    hostWindow.window = {
-      getWmeSdk: () => sdk
-    };
+    targetWindow.getWmeSdk = () => sdk;
     hostWindow.unsafeWindow = undefined;
 
     try {
@@ -137,7 +136,11 @@ await runTest(
         }
       });
     } finally {
-      hostWindow.window = previousWindow;
+      if (previousGetWmeSdk === undefined) {
+        delete targetWindow.getWmeSdk;
+      } else {
+        targetWindow.getWmeSdk = previousGetWmeSdk;
+      }
       hostWindow.unsafeWindow = previousUnsafeWindow;
     }
   }
@@ -150,8 +153,9 @@ await runTest(
       window?: any;
       unsafeWindow?: any;
     };
-    const previousWindow = hostWindow.window;
     const previousUnsafeWindow = hostWindow.unsafeWindow;
+    const targetWindow = hostWindow.window ?? (hostWindow.window = {});
+    const previousGetWmeSdk = targetWindow.getWmeSdk;
     let updateArgs: Record<string, unknown> | undefined;
 
     const geometryProposal: PlaceProposal = {
@@ -187,9 +191,7 @@ await runTest(
       }
     };
 
-    hostWindow.window = {
-      getWmeSdk: () => sdk
-    };
+    targetWindow.getWmeSdk = () => sdk;
     hostWindow.unsafeWindow = undefined;
 
     try {
@@ -221,7 +223,11 @@ await runTest(
       assert.equal(geometry.coordinates[0][0][1], geometry.coordinates[0][1][1]);
       assert.equal(geometry.coordinates[0][1][1], -geometry.coordinates[0][2][1]);
     } finally {
-      hostWindow.window = previousWindow;
+      if (previousGetWmeSdk === undefined) {
+        delete targetWindow.getWmeSdk;
+      } else {
+        targetWindow.getWmeSdk = previousGetWmeSdk;
+      }
       hostWindow.unsafeWindow = previousUnsafeWindow;
     }
   }

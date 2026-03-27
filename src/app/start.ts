@@ -561,7 +561,8 @@ async function refreshExternalProviderValidation(params: {
     venue: params.venue,
     currentCategories: params.currentCategories,
     currentOpeningHours: params.currentOpeningHours,
-    settings: googleMapsValidationSettings
+    settings: googleMapsValidationSettings,
+    config: runtimeConfig?.googleMapsValidation
   });
 
   if (params.requestId !== externalProviderValidationRequestId) {
@@ -898,10 +899,11 @@ async function scanVisibleVenuesFromMap(
 
   logger.info(`Scanning ${venues.length} visible venue(s)`);
 
-  const summary = scanVisibleVenues({
+  const summary = await scanVisibleVenues({
     venues,
     runtimeConfig,
     runtimeChains,
+    googleMapsValidationSettings: getEffectiveRuntimeGoogleMapsValidationSettings(),
     whitelistRuntime: getCurrentWhitelistRuntimeSnapshot() ?? undefined
   });
 

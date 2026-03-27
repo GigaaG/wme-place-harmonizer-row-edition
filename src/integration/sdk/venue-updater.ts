@@ -28,6 +28,80 @@ interface BuildUpdateArgsResult {
 const EARTH_METERS_PER_LATITUDE_DEGREE = 111320;
 const POINT_TO_POLYGON_HALF_SIDE_METERS = 5;
 
+function normalizeOpeningHourTime(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+    return undefined;
+  }
+
+  const hours = Number(trimmed.slice(0, 2));
+  const minutes = Number(trimmed.slice(3, 5));
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return undefined;
+  }
+
+  return trimmed;
+}
+
+function sanitizeOpeningHoursForSdkUpdate(
+  value: unknown
+): Array<{ days: number[]; fromHour: string; toHour: string }> | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const sanitized: Array<{ days: number[]; fromHour: string; toHour: string }> = [];
+
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      return undefined;
+    }
+
+    const typedEntry = entry as {
+      days?: unknown;
+      fromHour?: unknown;
+      toHour?: unknown;
+    };
+    const rawDays = Array.isArray(typedEntry.days) ? typedEntry.days : undefined;
+    const fromHour = normalizeOpeningHourTime(typedEntry.fromHour);
+    const toHour = normalizeOpeningHourTime(typedEntry.toHour);
+
+    if (!rawDays || rawDays.length === 0 || !fromHour || !toHour) {
+      return undefined;
+    }
+
+    const days = Array.from(
+      new Set(
+        rawDays.filter(
+          (day): day is number =>
+            typeof day === "number" &&
+            Number.isInteger(day) &&
+            day >= 0 &&
+            day <= 6
+        )
+      )
+    ).sort((left, right) => left - right);
+
+    if (days.length !== rawDays.length) {
+      return undefined;
+    }
+
+    sanitized.push({
+      days,
+      fromHour,
+      toHour
+    });
+  }
+
+  return sanitized;
+}
+
 function buildUpdatedServices(
   currentServices: string[],
   proposals: PlaceProposal[]
@@ -372,8 +446,21 @@ function buildUpdateArgs(
         appliedProposalCount += 1;
         break;
       case "openingHours":
-        args.openingHours = proposal.proposedValue as unknown[];
-        appliedProposalCount += 1;
+        {
+          const openingHours = sanitizeOpeningHoursForSdkUpdate(
+            proposal.proposedValue
+          );
+
+          if (!openingHours) {
+            errors.push(
+              "Opening-hours proposal could not be converted to a valid WME SDK openingHours payload"
+            );
+            break;
+          }
+
+          args.openingHours = openingHours;
+          appliedProposalCount += 1;
+        }
         break;
       case "geometry": {
         if (proposal.proposedValue === "point") {

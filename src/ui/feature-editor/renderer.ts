@@ -188,6 +188,87 @@ function renderProposal(
   return html;
 }
 
+function isExternalProviderChoiceProposal(proposal: PlaceProposal): boolean {
+  return (
+    proposal.field === "externalProviderIds" &&
+    proposal.isApplySupported &&
+    typeof proposal.externalProviderTargetId === "string" &&
+    proposal.externalProviderTargetId.trim().length > 0
+  );
+}
+
+function shouldRenderAsSingleChoiceGroup(
+  group: FeatureEditorIssueGroup
+): boolean {
+  return (
+    group.field === "externalProviderIds" &&
+    group.proposals.filter((proposal) => isExternalProviderChoiceProposal(proposal))
+      .length > 1
+  );
+}
+
+function renderExternalProviderChoiceGroup(
+  issue: PlaceIssue,
+  group: FeatureEditorIssueGroup
+): string {
+  let html = "";
+  const currentValue = group.proposals[0];
+  const radioName = `wmeph-row-external-provider-${group.key}`;
+
+  if (
+    currentValue &&
+    (currentValue.currentValue !== undefined ||
+      (currentValue.displayCurrentValue ?? "").trim().length > 0)
+  ) {
+    html += `
+      <div style="font-size:12px;margin-top:6px;">
+        <b>${escapeHtml(t("featureEditor.current"))}:</b> ${formatProposalValue(
+          currentValue.currentValue,
+          currentValue.displayCurrentValue
+        )}
+      </div>
+    `;
+  }
+
+  for (let index = 0; index < group.proposals.length; index += 1) {
+    const proposal = group.proposals[index];
+    const suggestedValue = formatLinkedProposalValue(
+      proposal.proposedValue,
+      proposal.displayProposedValue,
+      proposal.displayProposedValueUrl
+    );
+
+    html += `
+      <label style="
+        display:block;
+        font-size:12px;
+        margin-top:${index === 0 ? 6 : 8}px;
+        ${index > 0 ? "padding-top:8px;border-top:1px solid #eee;" : ""}
+      ">
+        <input
+          type="radio"
+          name="${escapeHtml(radioName)}"
+          class="wmeph-row-apply-radio"
+          data-proposal-id="${escapeHtml(proposal.id ?? "")}"
+        />
+        <span style="margin-left:4px;">
+          <b>${escapeHtml(t("featureEditor.suggested"))}:</b> ${suggestedValue}
+        </span>
+      </label>
+    `;
+
+    if (proposal.reason && proposal.reason !== issue.message) {
+      html += `
+        <div style="font-size:12px;color:#666;margin-top:4px;margin-left:20px;">
+          ${escapeHtml(proposal.reason)}
+        </div>
+      `;
+    }
+  }
+
+  return html;
+}
+
 function renderIssue(group: FeatureEditorIssueGroup): string {
   let html = "";
   const colors = getSeverityColors(group.severity);
@@ -217,8 +298,12 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
     `;
   }
 
-  for (let index = 0; index < group.proposals.length; index += 1) {
-    html += renderProposal(group.issues[0], group.proposals[index], index);
+  if (shouldRenderAsSingleChoiceGroup(group)) {
+    html += renderExternalProviderChoiceGroup(group.issues[0], group);
+  } else {
+    for (let index = 0; index < group.proposals.length; index += 1) {
+      html += renderProposal(group.issues[0], group.proposals[index], index);
+    }
   }
 
   if (canWhitelist) {

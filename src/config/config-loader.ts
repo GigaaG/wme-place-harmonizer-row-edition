@@ -5,6 +5,7 @@ import type {
   RuntimeRulesConfig,
   SupportedConfigType
 } from "../types/config.ts";
+import { GOOGLE_MAPS_VALIDATION_CHECK_KEYS } from "../types/settings.ts";
 import { getConfigUrl } from "./config-source.ts";
 
 const SUPPORTED_CONFIG_TYPES = new Set<SupportedConfigType>([
@@ -53,6 +54,48 @@ function validateRules(
   }
 
   return value as RuntimeRulesConfig;
+}
+
+function validateGoogleMapsValidationConfig(
+  value: unknown,
+  path: string
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (!isPlainObject(value)) {
+    throw new Error(`Config googleMapsValidation must be an object: ${path}`);
+  }
+
+  if (
+    value.enabled !== undefined &&
+    typeof value.enabled !== "boolean"
+  ) {
+    throw new Error(
+      `Config googleMapsValidation.enabled must be a boolean: ${path}`
+    );
+  }
+
+  if (value.checks === undefined) {
+    return;
+  }
+
+  if (!isPlainObject(value.checks)) {
+    throw new Error(
+      `Config googleMapsValidation.checks must be an object: ${path}`
+    );
+  }
+
+  for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
+    const checkValue = value.checks[checkKey];
+
+    if (checkValue !== undefined && typeof checkValue !== "boolean") {
+      throw new Error(
+        `Config googleMapsValidation.checks.${checkKey} must be a boolean: ${path}`
+      );
+    }
+  }
 }
 
 export function validateConfigFile(
@@ -110,6 +153,7 @@ export function validateConfigFile(
   }
 
   validateRules(value.rules, path);
+  validateGoogleMapsValidationConfig(value.googleMapsValidation, path);
 
   if (value.categoryStandards !== undefined) {
     if (!isPlainObject(value.categoryStandards)) {

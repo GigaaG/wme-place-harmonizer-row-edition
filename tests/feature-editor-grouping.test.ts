@@ -109,3 +109,47 @@ runTest("keeps informational cards informational when no stronger severity exist
   assert.equal(groups[0].severity, "info");
   assert.equal(groups[0].message, "Bus stops are not considered bus stations in the Netherlands.");
 });
+
+runTest("groups multiple external provider suggestions into one feature-editor card", () => {
+  const issues: PlaceIssue[] = [
+    {
+      field: "externalProviderIds",
+      severity: "warning",
+      message: "At least one external provider id is required",
+      ruleId: "externalProvider.required"
+    }
+  ];
+  const proposals: PlaceProposal[] = [
+    {
+      id: "provider-1",
+      field: "externalProviderIds",
+      groupKey: "externalProviderIds::externalProvider.required",
+      currentValue: [],
+      proposedValue: ["provider-1"],
+      displayProposedValue: "Albert Heijn (10 m)",
+      reason: "Damrak 1 | 10 m away",
+      issueRuleId: "externalProvider.required",
+      isApplySupported: true,
+      actionType: "set-field",
+      externalProviderTargetId: "provider-1"
+    },
+    {
+      id: "provider-2",
+      field: "externalProviderIds",
+      groupKey: "externalProviderIds::externalProvider.required",
+      currentValue: [],
+      proposedValue: ["provider-2"],
+      displayProposedValue: "Albert Heijn To Go (20 m)",
+      reason: "Damrak 2 | 20 m away",
+      issueRuleId: "externalProvider.required",
+      isApplySupported: true,
+      actionType: "set-field",
+      externalProviderTargetId: "provider-2"
+    }
+  ];
+
+  const groups = groupIssuesForFeatureEditor(issues, proposals);
+
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].proposals.length, 2);
+});

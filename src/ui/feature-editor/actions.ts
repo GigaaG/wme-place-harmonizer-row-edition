@@ -3,14 +3,22 @@ import type { PlaceProposal } from "../../types/proposal";
 export function getSelectedProposals(
   proposals: PlaceProposal[]
 ): PlaceProposal[] {
-  const checkboxes = Array.from(
-    document.querySelectorAll<HTMLInputElement>(".wmeph-row-apply-checkbox")
-  );
+  const selectedInputs = [
+    ...Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        ".wmeph-row-apply-checkbox:checked"
+      )
+    ),
+    ...Array.from(
+      document.querySelectorAll<HTMLInputElement>(
+        ".wmeph-row-apply-radio:checked"
+      )
+    )
+  ];
 
   const selectedIds = new Set(
-    checkboxes
-      .filter((checkbox) => checkbox.checked)
-      .map((checkbox) => checkbox.dataset.proposalId ?? "")
+    selectedInputs
+      .map((input) => input.dataset.proposalId ?? "")
       .filter((proposalId) => proposalId.length > 0)
   );
 

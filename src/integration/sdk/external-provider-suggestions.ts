@@ -7,7 +7,7 @@ import type { ExternalProviderSuggestion } from "../../types/external-provider.t
 import { findExternalProviderEditorCandidates } from "./external-provider-editor.ts";
 import { t } from "../../i18n/runtime.ts";
 
-const MAX_EXTERNAL_PROVIDER_SUGGESTIONS = 1;
+const MAX_EXTERNAL_PROVIDER_SUGGESTIONS = 5;
 const MIN_NAME_SCORE = 0.55;
 const MAX_SUGGESTION_DISTANCE_METERS = 500;
 const ABSOLUTE_MAX_SUGGESTION_DISTANCE_METERS = 1000;
@@ -582,7 +582,7 @@ export function resolveNearbySearchTypes(venue: any): string[] {
   return placeTypes;
 }
 
-async function runWazeptStyleNearbySearch(params: {
+async function runCategoryTypedNearbySearch(params: {
   service: any;
   googleMaps: any;
   origin: SearchOrigin;
@@ -679,23 +679,23 @@ export async function findSuggestedExternalProviders(
 
     if (container) {
       const service = new googleMaps.places.PlacesService(container);
-      const wazeptCandidates = await runWazeptStyleNearbySearch({
+      const typedNearbyCandidates = await runCategoryTypedNearbySearch({
         service,
         googleMaps,
         origin,
         venue
       });
-      const wazeptSuggestions = rankExternalProviderSuggestions(
+      const typedNearbySuggestions = rankExternalProviderSuggestions(
         searchQuery,
         origin,
-        wazeptCandidates
+        typedNearbyCandidates
       );
 
-      if (wazeptSuggestions.length > 0) {
+      if (typedNearbySuggestions.length > 0) {
         logger.info(
-          `Found ${wazeptSuggestions.length} WAZEPT-style nearby external provider suggestion(s)`
+          `Found ${typedNearbySuggestions.length} category-typed nearby external provider suggestion(s)`
         );
-        return wazeptSuggestions;
+        return typedNearbySuggestions;
       }
 
       const location = new googleMaps.LatLng(origin.lat, origin.lon);
@@ -784,6 +784,10 @@ function buildSearchProposalId(issue: PlaceIssue, suffix: string): string {
   return `${issue.ruleId ?? issue.field}:external-provider:${suffix}`;
 }
 
+function buildExternalProviderSuggestionGroupKey(issue: PlaceIssue): string {
+  return issue.groupKey ?? `${issue.field}::${issue.ruleId ?? issue.message}`;
+}
+
 export function buildGoogleMapsPlaceUrl(
   suggestion: ExternalProviderSuggestion
 ): string {
@@ -814,6 +818,7 @@ export function buildExternalProviderSuggestionProposals(
     return {
       id: buildSearchProposalId(issue, suggestion.providerId),
       field: issue.field,
+      groupKey: buildExternalProviderSuggestionGroupKey(issue),
       currentValue: currentExternalProviderIds,
       proposedValue: mergedProviderIds,
       displayCurrentValue:

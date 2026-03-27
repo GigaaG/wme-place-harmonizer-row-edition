@@ -28,7 +28,7 @@ runTest("normalizes punctuation and spacing when scoring provider names", () => 
   assert.equal(scoreExternalProviderName("Shell", "BP"), 0);
 });
 
-runTest("maps WME categories to WAZEPT-style Google nearbySearch types", () => {
+runTest("maps WME categories to Google nearbySearch types", () => {
   assert.deepEqual(
     resolveNearbySearchTypes({
       categories: ["SUPERMARKET_GROCERY", "RESTAURANT", "SUPERMARKET_GROCERY"]
@@ -88,9 +88,9 @@ runTest("ranks closer and stronger nearby provider matches first", () => {
 
   assert.deepEqual(
     suggestions.map((suggestion) => suggestion.providerId),
-    ["exact-farther"]
+    ["exact-farther", "partial-near"]
   );
-  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions.length, 2);
 });
 
 runTest("keeps editor suggestion order as tie-breaker after name scoring", () => {
@@ -115,7 +115,58 @@ runTest("keeps editor suggestion order as tie-breaker after name scoring", () =>
 
   assert.deepEqual(
     suggestions.map((suggestion) => suggestion.providerId),
-    ["editor-0"]
+    ["editor-0", "editor-1"]
+  );
+});
+
+runTest("keeps only the top five ranked nearby provider suggestions", () => {
+  const suggestions = rankExternalProviderSuggestions(
+    "Albert Heijn",
+    { lon: 4.9, lat: 52.37 },
+    [
+      {
+        providerId: "provider-6",
+        name: "Albert Heijn",
+        address: "Address 6",
+        location: { lon: 4.9007, lat: 52.37 }
+      },
+      {
+        providerId: "provider-5",
+        name: "Albert Heijn",
+        address: "Address 5",
+        location: { lon: 4.9006, lat: 52.37 }
+      },
+      {
+        providerId: "provider-4",
+        name: "Albert Heijn",
+        address: "Address 4",
+        location: { lon: 4.9005, lat: 52.37 }
+      },
+      {
+        providerId: "provider-3",
+        name: "Albert Heijn",
+        address: "Address 3",
+        location: { lon: 4.9004, lat: 52.37 }
+      },
+      {
+        providerId: "provider-2",
+        name: "Albert Heijn",
+        address: "Address 2",
+        location: { lon: 4.9003, lat: 52.37 }
+      },
+      {
+        providerId: "provider-1",
+        name: "Albert Heijn",
+        address: "Address 1",
+        location: { lon: 4.9002, lat: 52.37 }
+      }
+    ]
+  );
+
+  assert.equal(suggestions.length, 5);
+  assert.deepEqual(
+    suggestions.map((suggestion) => suggestion.providerId),
+    ["provider-1", "provider-2", "provider-3", "provider-4", "provider-5"]
   );
 });
 

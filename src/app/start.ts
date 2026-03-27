@@ -2,6 +2,11 @@ import { APP_NAME } from "../constants/app";
 import { BUILD_MODE, IS_DEV_SCRIPT_BUILD } from "../constants/build";
 import { logger } from "../logging/logger";
 import { settingsManager } from "../settings/manager";
+import {
+  getDefaultGoogleMapsValidationAvailability,
+  getEffectiveGoogleMapsValidationSettings,
+  resolveGoogleMapsValidationAvailability
+} from "../settings/google-maps-validation-policy";
 import { mountSidebarPlaceholder } from "../integration/sdk/sidebar";
 import { loadManifest } from "../config/manifest-loader";
 import { resolveRuntimeConfig } from "../config/runtime-config";
@@ -37,7 +42,12 @@ import { applyVenueProposals } from "../integration/sdk/venue-updater";
 import type { PlaceProposal } from "../types/proposal";
 import { setSidebarDebugState, getSidebarDebugState } from "./app-state";
 import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
-import { wireSidebarPanelActions, wireSidebarReloadButton } from "../ui/sidebar/actions";
+import {
+  wireSidebarPanelActions,
+  wireSidebarReloadButton,
+  wireSidebarGoogleMapsValidationChecks,
+  wireSidebarGoogleMapsValidationToggle
+} from "../ui/sidebar/actions";
 import { getVisibleVenues } from "../integration/sdk/visible-venues";
 import { scanVisibleVenues } from "./scan-visible-venues";
 import { wireSidebarScanButton } from "../ui/sidebar/actions";
@@ -58,6 +68,10 @@ import {
   buildExternalProviderSuggestionProposals,
   findSuggestedExternalProviders
 } from "../integration/sdk/external-provider-suggestions";
+import {
+  isExternalProviderValidationRuleId,
+  validateLinkedExternalProviders
+} from "../integration/sdk/external-provider-validation";
 import type { WhitelistEntry, WhitelistRuntimeSnapshot } from "../types/whitelist";
 import {
   filterWhitelistedAnalysis,
@@ -65,6 +79,11 @@ import {
 } from "../whitelist/manager";
 import { loadBestAvailableLocale } from "../i18n/locale-loader.ts";
 import { setRuntimeLocale, t } from "../i18n/runtime.ts";
+import type {
+  GoogleMapsValidationCheckKey,
+  GoogleMapsValidationSettings,
+  UserSettings
+} from "../types/settings";
 
 //
 // Runtime containers
@@ -73,9 +92,10 @@ import { setRuntimeLocale, t } from "../i18n/runtime.ts";
 let runtimeManifest: any | null = null;
 let runtimeConfig: any | null = null;
 let runtimeChains: any | null = null;
-let runtimeSettings: any | null = null;
+let runtimeSettings: UserSettings | null = null;
 let runtimeCountry: string | undefined;
 let externalProviderSuggestionRequestId = 0;
+let externalProviderValidationRequestId = 0;
 
 //
 // Functions
@@ -448,6 +468,22 @@ function applyExternalProviderSuggestionToIssues(
   });
 }
 
+function removeExternalProviderValidationIssues(
+  issues: PlaceIssue[]
+): PlaceIssue[] {
+  return issues.filter(
+    (issue) => !isExternalProviderValidationRuleId(issue.ruleId)
+  );
+}
+
+function removeExternalProviderValidationProposals(
+  proposals: PlaceProposal[]
+): PlaceProposal[] {
+  return proposals.filter(
+    (proposal) => !isExternalProviderValidationRuleId(proposal.issueRuleId)
+  );
+}
+
 async function refreshExternalProviderSuggestions(params: {
   requestId: number;
   venue: any;
@@ -508,6 +544,61 @@ async function refreshExternalProviderSuggestions(params: {
   renderLatestVenueAnalysis();
 }
 
+async function refreshExternalProviderValidation(params: {
+  requestId: number;
+  venueId: string;
+  venueName: string;
+  externalProviderIds: string[];
+  venue: any;
+  currentCategories: string[];
+  currentOpeningHours: any[];
+}): Promise<void> {
+  const googleMapsValidationSettings =
+    getEffectiveRuntimeGoogleMapsValidationSettings();
+  const validation = await validateLinkedExternalProviders({
+    venueName: params.venueName,
+    externalProviderIds: params.externalProviderIds,
+    venue: params.venue,
+    currentCategories: params.currentCategories,
+    currentOpeningHours: params.currentOpeningHours,
+    settings: googleMapsValidationSettings
+  });
+
+  if (params.requestId !== externalProviderValidationRequestId) {
+    return;
+  }
+
+  const latest = getLatestAnalysisState();
+
+  if (!latest?.isVenueSelection || latest.venueId !== params.venueId) {
+    return;
+  }
+
+  const retainedIssues = removeExternalProviderValidationIssues(latest.issues);
+  const retainedProposals = removeExternalProviderValidationProposals(
+    latest.proposals
+  );
+  const filteredAnalysis = applyWhitelistToAnalysis({
+    venueId: latest.venueId,
+    issues: [...retainedIssues, ...validation.issues],
+    proposals: [...retainedProposals, ...validation.proposals]
+  });
+
+  setLatestAnalysisState({
+    ...latest,
+    issues: filteredAnalysis.issues,
+    proposals: filteredAnalysis.proposals
+  });
+
+  if (validation.issues.length > 0) {
+    logger.info(
+      `Linked external provider validation found ${validation.issues.length} issue(s) for venue ${params.venueId}`
+    );
+  }
+
+  renderLatestVenueAnalysis();
+}
+
 async function resolveStartupCountry(
   fallbackCountry?: string,
   attempts = 8,
@@ -543,6 +634,40 @@ async function loadRuntimeDataForCountry(country?: string): Promise<void> {
   await refreshRuntimeLocale();
 }
 
+function getGoogleMapsValidationAvailability() {
+  return runtimeConfig
+    ? resolveGoogleMapsValidationAvailability(runtimeConfig)
+    : getDefaultGoogleMapsValidationAvailability();
+}
+
+function getEffectiveRuntimeGoogleMapsValidationSettings():
+  | GoogleMapsValidationSettings
+  | undefined {
+  if (!runtimeSettings) {
+    return undefined;
+  }
+
+  return getEffectiveGoogleMapsValidationSettings({
+    user: runtimeSettings.googleMapsValidation,
+    availability: getGoogleMapsValidationAvailability()
+  });
+}
+
+function buildGoogleMapsValidationSidebarState(): {
+  googleMapsValidation?: GoogleMapsValidationSettings;
+  googleMapsValidationAvailability: ReturnType<
+    typeof getGoogleMapsValidationAvailability
+  >;
+} {
+  const googleMapsValidationAvailability =
+    getGoogleMapsValidationAvailability();
+
+  return {
+    googleMapsValidation: getEffectiveRuntimeGoogleMapsValidationSettings(),
+    googleMapsValidationAvailability
+  };
+}
+
 async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
   if (!runtimeSettings) {
     logger.warn("Cannot update auto scan setting: runtime settings unavailable");
@@ -561,6 +686,7 @@ async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
   if (sidebarState) {
     setSidebarDebugState({
       ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
       autoScanVisibleVenues: enabled,
       lastStatus: enabled
         ? t("status.autoScanEnabled")
@@ -569,6 +695,139 @@ async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
 
     await rerenderSidebar();
   }
+}
+
+function hasEnabledGoogleMapsValidationChecks(): boolean {
+  const checks = getEffectiveRuntimeGoogleMapsValidationSettings()?.checks;
+
+  if (!checks) {
+    return false;
+  }
+
+  return Object.values(checks).some(Boolean);
+}
+
+async function reanalyzeCurrentVenueSelection(): Promise<void> {
+  const latest = getLatestAnalysisState();
+
+  if (!latest?.isVenueSelection) {
+    return;
+  }
+
+  const sdk = getWmeSdk();
+
+  if (!sdk) {
+    logger.warn("Cannot re-analyze current venue: SDK unavailable");
+    return;
+  }
+
+  const venue = sdk.DataModel?.Venues?.getById?.({
+    venueId: latest.venueId
+  });
+
+  if (!venue) {
+    logger.warn(`Cannot re-analyze current venue: ${latest.venueId} not found`);
+    return;
+  }
+
+  await analyzeVenue({
+    venue
+  });
+}
+
+async function setGoogleMapsValidationEnabled(enabled: boolean): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn(
+      "Cannot update Google Maps validation setting: runtime settings unavailable"
+    );
+    return;
+  }
+
+  const availability = getGoogleMapsValidationAvailability();
+
+  if (!availability.enabled) {
+    logger.info(
+      "Ignoring Google Maps validation toggle because runtime config disables it"
+    );
+    return;
+  }
+
+  runtimeSettings = {
+    ...runtimeSettings,
+    googleMapsValidation: {
+      ...runtimeSettings.googleMapsValidation,
+      enabled
+    }
+  };
+
+  settingsManager.save(runtimeSettings);
+
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
+      lastStatus: enabled
+        ? t("status.googleMapsValidation.enabled")
+        : t("status.googleMapsValidation.disabled")
+    });
+
+    await rerenderSidebar();
+  }
+
+  await reanalyzeCurrentVenueSelection();
+}
+
+async function setGoogleMapsValidationCheck(
+  checkKey: GoogleMapsValidationCheckKey,
+  enabled: boolean
+): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn(
+      "Cannot update Google Maps validation checks: runtime settings unavailable"
+    );
+    return;
+  }
+
+  const availability = getGoogleMapsValidationAvailability();
+
+  if (!availability.enabled || !availability.checks[checkKey]) {
+    logger.info(
+      `Ignoring Google Maps validation check toggle because runtime config disables ${checkKey}`
+    );
+    return;
+  }
+
+  runtimeSettings = {
+    ...runtimeSettings,
+    googleMapsValidation: {
+      ...runtimeSettings.googleMapsValidation,
+      checks: {
+        ...runtimeSettings.googleMapsValidation.checks,
+        [checkKey]: enabled
+      }
+    }
+  };
+
+  settingsManager.save(runtimeSettings);
+
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
+      lastStatus: t("status.googleMapsValidation.checkUpdated", {
+        checkName: t(`sidebar.googleMapsValidation.${checkKey}`),
+        state: enabled ? t("common.enabled") : t("common.disabled")
+      })
+    });
+
+    await rerenderSidebar();
+  }
+
+  await reanalyzeCurrentVenueSelection();
 }
 
 async function rerenderSidebar(): Promise<void> {
@@ -585,6 +844,16 @@ async function rerenderSidebar(): Promise<void> {
   wireSidebarAutoScanToggle(
     !!state.autoScanVisibleVenues,
     setAutoScanVisibleVenues
+  );
+  wireSidebarGoogleMapsValidationToggle(
+    state.googleMapsValidation?.enabled ?? true,
+    setGoogleMapsValidationEnabled
+  );
+  wireSidebarGoogleMapsValidationChecks(
+    state.googleMapsValidation?.checks ??
+      getEffectiveRuntimeGoogleMapsValidationSettings()?.checks ??
+      settingsManager.load().googleMapsValidation.checks,
+    setGoogleMapsValidationCheck
   );
 }
 
@@ -653,6 +922,7 @@ async function scanVisibleVenuesFromMap(
   if (sidebarState) {
     setSidebarDebugState({
       ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
       runtimeConfigId: runtimeConfig.id,
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
@@ -699,6 +969,7 @@ async function reloadData(): Promise<void> {
   if (sidebarState && runtimeManifest && runtimeConfig && runtimeChains) {
     setSidebarDebugState({
       ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
       manifestVersion: runtimeManifest.version,
       manifestRevision: runtimeManifest.dataRevision,
       runtimeConfigId: runtimeConfig.id,
@@ -1047,6 +1318,7 @@ async function analyzeVenue(params: {
   if (sidebarState) {
     setSidebarDebugState({
       ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
       runtimeConfigId: runtimeConfig.id,
       runtimeConfigVersion: runtimeConfig.version,
       runtimeChainsId: runtimeChains.id,
@@ -1094,6 +1366,25 @@ async function analyzeVenue(params: {
       venue,
       issue: suggestionIssue,
       query: place.name
+    });
+  }
+
+  externalProviderValidationRequestId += 1;
+  const effectiveGoogleMapsValidation =
+    getEffectiveRuntimeGoogleMapsValidationSettings();
+  if (
+    effectiveGoogleMapsValidation?.enabled &&
+    hasEnabledGoogleMapsValidationChecks() &&
+    (place.externalProviderIds ?? []).length > 0
+  ) {
+    void refreshExternalProviderValidation({
+      requestId: externalProviderValidationRequestId,
+      venueId: String(venue.id),
+      venueName: place.name,
+      externalProviderIds: place.externalProviderIds ?? [],
+      venue,
+      currentCategories: place.categories ?? [],
+      currentOpeningHours: place.openingHours ?? []
     });
   }
 }
@@ -1166,7 +1457,8 @@ export async function startApplication(): Promise<void> {
     runtimeChainsCount: runtimeChains.items.length,
     lastStatus: t("status.ready"),
     highlightsEnabled: true,
-    autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true
+    autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true,
+    ...buildGoogleMapsValidationSidebarState()
   });
 
   const sidebarState = getSidebarDebugState();
@@ -1217,6 +1509,7 @@ export async function startApplication(): Promise<void> {
       if (sidebarState) {
         setSidebarDebugState({
           ...sidebarState,
+          ...buildGoogleMapsValidationSidebarState(),
           lastStatus: t("status.selectionNotVenue")
         });
 

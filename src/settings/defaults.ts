@@ -6,6 +6,17 @@ export function getDefaultSettings(): UserSettings {
     dataChannel: DEFAULT_DATA_CHANNEL,
     debugEnabled: false,
     fallbackCountry: undefined,
-    autoScanVisibleVenues: true
+    autoScanVisibleVenues: true,
+    googleMapsValidation: {
+      enabled: true,
+      checks: {
+        notFound: true,
+        closed: true,
+        locationDrift: true,
+        nameMismatch: true,
+        category: true,
+        openingHours: true
+      }
+    }
   };
 }

@@ -1,20 +1,18 @@
 import type { GeometryType } from "./chains";
 import type { AddressPolicy, PresenceRequirement } from "./address";
 import type { LocalizedTextList } from "./i18n";
-
-export interface ConfigMeta {
-  name?: string;
-  description?: string;
-}
-
-export interface ConfigScope {
-  country?: string;
-  countries?: string[];
-}
+ 
+// This type intentionally models the subset of config that the current
+// userscript runtime actively consumes.
+export type SupportedConfigType =
+  | "global-config"
+  | "community-config"
+  | "country-config"
+  | "state-config";
 
 export interface RuleConfig {
   enabled: boolean;
-  severity?: "info" | "warning" | "error";
+  severity: "info" | "warning" | "error";
 }
 
 export interface PhoneFormattingConfig {
@@ -36,6 +34,10 @@ export interface UrlFormattingConfig {
 export interface FormattingConfig {
   phone?: PhoneFormattingConfig;
   url?: UrlFormattingConfig;
+}
+
+export interface ConfigDefaults {
+  locale?: string;
 }
 
 export interface GeometryStandard {
@@ -65,20 +67,19 @@ export interface CategoryStandard {
   editorNotes?: LocalizedTextList;
 }
 
+export interface RuntimeRulesConfig {
+  cityInVenueName?: RuleConfig;
+  [ruleId: string]: RuleConfig | undefined;
+}
+
 export interface HarmonizerConfig {
   id: string;
-  type: string;
+  type: SupportedConfigType;
   version: number;
   extends?: string;
 
-  meta?: ConfigMeta;
-  scope?: ConfigScope;
-
-  defaults?: Record<string, unknown>;
+  defaults?: ConfigDefaults;
   formatting?: FormattingConfig;
-  matching?: Record<string, unknown>;
-  highlighting?: Record<string, unknown>;
-
-  rules?: Record<string, RuleConfig>;
+  rules?: RuntimeRulesConfig;
   categoryStandards?: Record<string, CategoryStandard>;
 }

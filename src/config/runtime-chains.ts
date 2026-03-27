@@ -1,8 +1,12 @@
-import { logger } from "../logging/logger";
-import { loadChainFile } from "./chain-loader";
-import { mergeChainDatasets } from "./chain-merger";
-import type { ChainDataset } from "../types/chains";
-import { getCountryCodeCandidates } from "./country-code";
+import { logger } from "../logging/logger.ts";
+import { loadChainFile } from "./chain-loader.ts";
+import { mergeChainDatasets } from "./chain-merger.ts";
+import type { ChainDataset } from "../types/chains.ts";
+import { getCountryCodeCandidates } from "./country-code.ts";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown chain loading error";
+}
 
 export async function resolveRuntimeChains(country?: string): Promise<ChainDataset> {
   const countryCandidates = getCountryCodeCandidates(country);
@@ -20,11 +24,15 @@ export async function resolveRuntimeChains(country?: string): Promise<ChainDatas
       logger.info(`Applying country chains: ${countryCode}`);
 
       return mergeChainDatasets(globalChains, countryChains);
-    } catch {
-      // Try next candidate
+    } catch (error) {
+      logger.warn(
+        `Country chain dataset ${countryCode} could not be loaded: ${getErrorMessage(error)}`
+      );
     }
   }
 
-  logger.warn(`Country chain dataset not found for ${countryCandidates.join(", ")}, using global chains`);
+  logger.warn(
+    `No valid country chain dataset found for ${countryCandidates.join(", ")}; using global chains`
+  );
   return globalChains;
 }

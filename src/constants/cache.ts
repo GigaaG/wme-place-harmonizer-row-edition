@@ -1,4 +1,4 @@
-import { APP_STORAGE_PREFIX } from "./app";
+import { APP_STORAGE_PREFIX } from "./app.ts";
 
 export const CACHE_KEYS = {
   manifest: `${APP_STORAGE_PREFIX}:cache:manifest`,

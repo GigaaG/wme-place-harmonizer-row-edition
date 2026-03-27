@@ -1,24 +1,30 @@
-import { logger } from "../logging/logger";
-import { loadConfigFile } from "./config-loader";
-import { mergeConfigs } from "./config-merger";
-import type { HarmonizerConfig } from "../types/config";
-import { getCountryCodeCandidates } from "./country-code";
+import { logger } from "../logging/logger.ts";
+import { loadConfigFile } from "./config-loader.ts";
+import { mergeConfigs } from "./config-merger.ts";
+import type { HarmonizerConfig } from "../types/config.ts";
+import { getCountryCodeCandidates } from "./country-code.ts";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown config loading error";
+}
 
 function resolveConfigExtendsPath(extendsId: string): string {
-  if (extendsId === "global") {
+  const normalizedExtendsId = extendsId.trim();
+
+  if (normalizedExtendsId === "global") {
     return "config/global.json";
   }
 
-  if (extendsId.startsWith("community:")) {
-    return `config/communities/${extendsId.slice("community:".length)}.json`;
+  if (normalizedExtendsId.startsWith("community:")) {
+    return `config/communities/${normalizedExtendsId.slice("community:".length)}.json`;
   }
 
-  if (extendsId.startsWith("country:")) {
-    return `config/countries/${extendsId.slice("country:".length)}.json`;
+  if (normalizedExtendsId.startsWith("country:")) {
+    return `config/countries/${normalizedExtendsId.slice("country:".length)}.json`;
   }
 
-  if (extendsId.startsWith("state:")) {
-    return `config/states/${extendsId.slice("state:".length)}.json`;
+  if (normalizedExtendsId.startsWith("state:")) {
+    return `config/states/${normalizedExtendsId.slice("state:".length)}.json`;
   }
 
   throw new Error(`Unsupported config extends reference: ${extendsId}`);
@@ -66,12 +72,16 @@ export async function resolveRuntimeConfig(
       logger.info(`Applying country config: ${countryCode}`);
 
       return mergeConfigs(globalConfig, countryConfig);
-    } catch {
-      // Try next candidate
+    } catch (error) {
+      logger.warn(
+        `Country config ${countryCode} could not be loaded: ${getErrorMessage(error)}`
+      );
     }
   }
 
-  logger.warn(`Country config not found for ${countryCandidates.join(", ")}, using global`);
+  logger.warn(
+    `No valid country config found for ${countryCandidates.join(", ")}; using global`
+  );
 
   return globalConfig;
 }

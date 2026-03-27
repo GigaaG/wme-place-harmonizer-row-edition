@@ -1,4 +1,4 @@
-import { IS_DEV_SCRIPT_BUILD } from "./build";
+import { IS_DEV_SCRIPT_BUILD } from "./build.ts";
 
 export const APP_NAME = "WME Place Harmonizer ROW Edition";
 export const APP_SHORT_NAME = "WMEPH-ROW";

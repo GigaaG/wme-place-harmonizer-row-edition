@@ -14,3 +14,4 @@ import "./venue-updater.geometry.test.ts";
 import "./venue-save-scan.test.ts";
 import "./whitelist-manager.test.ts";
 import "./i18n-utils.test.ts";
+import "./runtime-data-loading.test.ts";

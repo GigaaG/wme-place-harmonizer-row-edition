@@ -3,9 +3,9 @@ import {
   DATA_REPOSITORY_NAME,
   DATA_REPOSITORY_BRANCH,
   appendQueryParam
-} from "./source";
-import { cacheManager } from "../cache/cache-manager";
-import { CACHE_KEYS } from "../constants/cache";
+} from "./source.ts";
+import { cacheManager } from "../cache/cache-manager.ts";
+import { CACHE_KEYS } from "../constants/cache.ts";
 
 function getManifestRevision(): string | undefined {
   try {

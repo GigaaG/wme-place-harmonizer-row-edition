@@ -1,5 +1,5 @@
-import type { DataChannel } from "../constants/app";
-import { IS_DEV_SCRIPT_BUILD } from "../constants/build";
+import type { DataChannel } from "../constants/app.ts";
+import { IS_DEV_SCRIPT_BUILD } from "../constants/build.ts";
 
 export const DATA_REPOSITORY_OWNER = "GigaaG";
 export const DATA_REPOSITORY_NAME = "wme-place-harmonizer-row-data";

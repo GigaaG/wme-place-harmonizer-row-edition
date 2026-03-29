@@ -89,9 +89,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.user.js
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
           git add -f dist/wme-place-harmonizer-row-edition.beta.user.js
-          if git diff --cached --quiet -- dist/wme-place-harmonizer-row-edition.beta.user.js; then
-            echo "Beta artifact unchanged; skipping publish."
+          if git diff --cached --quiet; then
+            echo "Beta branch artifact set unchanged; skipping publish."
           else
             git commit -m "chore: publish beta userscript [skip ci]"
             git push origin HEAD:beta
@@ -102,9 +105,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.beta.user.js
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
+          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
           git add -f dist/wme-place-harmonizer-row-edition.user.js
-          if git diff --cached --quiet -- dist/wme-place-harmonizer-row-edition.user.js; then
-            echo "Stable artifact unchanged; skipping publish."
+          if git diff --cached --quiet; then
+            echo "Main branch artifact set unchanged; skipping publish."
           else
             git commit -m "chore: publish stable userscript [skip ci]"
             git push origin HEAD:main

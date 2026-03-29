@@ -27,7 +27,7 @@ npm run test
 
 ## Continuous Integration
 
-A GitHub Actions workflow runs `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod` on pushes and pull requests, then uploads the generated userscript artifacts. On pushes to `beta`, the workflow republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, the workflow republishes `dist/wme-place-harmonizer-row-edition.user.js` back to the `main` branch so Greasy Fork can sync from a fixed stable artifact URL.
+A GitHub Actions workflow runs `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod` on pushes and pull requests, then uploads the generated userscript artifacts. On pushes to `beta`, the workflow republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, the workflow republishes `dist/wme-place-harmonizer-row-edition.user.js` back to the `main` branch so Greasy Fork can sync from a fixed stable artifact URL. Each branch publication step also removes the other channel artifacts from `dist`, so `beta` only keeps the beta script and `main` only keeps the stable script.
 
 ## Build modes
 

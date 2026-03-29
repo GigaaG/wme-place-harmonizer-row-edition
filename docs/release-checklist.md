@@ -34,6 +34,7 @@ Open a pull request from `beta` to `main` and confirm:
 - [ ] the PR description summarizes the release scope and notable changes
 - [ ] the PR description mentions any matching data-repo changes if the release depends on them
 - [ ] the PR description notes any exceptional post-merge follow-up if the release needs it
+- [ ] required PR verification checks are configured and passing before merge
 
 ## Pre-merge verification
 

@@ -84,9 +84,30 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  publish-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wme-place-harmonizer-row-edition
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          path: wme-place-harmonizer-row-edition
+
+      - name: Download verified build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: userscript-builds
+          path: wme-place-harmonizer-row-edition/artifact-download
+
       - name: Publish beta artifact to beta branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
         run: |
+          mkdir -p dist
+          cp artifact-download/beta/wme-place-harmonizer-row-edition.beta.user.js dist/
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.user.js
@@ -96,13 +117,34 @@ jobs:
           if git diff --cached --quiet; then
             echo "Beta branch artifact set unchanged; skipping publish."
           else
-            git commit -m "chore: publish beta userscript [skip ci]"
+            git commit -m "ci(beta): publish userscript [skip ci]"
             git push origin HEAD:beta
           fi
 
+  publish-stable:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wme-place-harmonizer-row-edition
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          path: wme-place-harmonizer-row-edition
+
+      - name: Download verified build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: userscript-builds
+          path: wme-place-harmonizer-row-edition/artifact-download
+
       - name: Publish stable artifact to main branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          mkdir -p dist
+          cp artifact-download/prod/wme-place-harmonizer-row-edition.user.js dist/
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.beta.user.js
@@ -112,6 +154,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Main branch artifact set unchanged; skipping publish."
           else
-            git commit -m "chore: publish stable userscript [skip ci]"
+            git commit -m "ci(main): publish stable userscript [skip ci]"
             git push origin HEAD:main
           fi

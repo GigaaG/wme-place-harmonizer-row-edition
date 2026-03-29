@@ -17,6 +17,9 @@ const packageJson = JSON.parse(
   readFileSync(resolve("package.json"), "utf8")
 );
 
+const PUBLISHED_USERSCRIPT_FILE_NAME = "wme-place-harmonizer-row-edition.user.js";
+const BETA_PUBLISH_BRANCH = "beta-dist";
+
 function getBuildSequence() {
   return (
     process.env.GITHUB_RUN_NUMBER ??
@@ -164,7 +167,7 @@ if (channel === "dev") {
       : packageJson.version;
   const updateUrl =
     channel === "beta"
-      ? `https://raw.githubusercontent.com/GigaaG/wme-place-harmonizer-row-edition/beta/dist/${targetFileName}`
+      ? `https://raw.githubusercontent.com/GigaaG/wme-place-harmonizer-row-edition/${BETA_PUBLISH_BRANCH}/dist/${PUBLISHED_USERSCRIPT_FILE_NAME}`
       : null;
   const runtimeChannelLine =
     `globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "${channel}";`;

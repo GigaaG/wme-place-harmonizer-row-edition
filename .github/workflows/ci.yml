@@ -102,23 +102,33 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: wme-place-harmonizer-row-edition/artifact-download
+          path: artifact-download
 
-      - name: Publish beta artifact to beta branch
+      - name: Publish beta artifact to beta-dist branch
         run: |
-          mkdir -p dist
-          cp artifact-download/beta/wme-place-harmonizer-row-edition.beta.user.js dist/
+          PUBLISH_BRANCH="beta-dist"
+          PUBLISH_FILE="dist/wme-place-harmonizer-row-edition.user.js"
+          SOURCE_FILE="../artifact-download/beta/wme-place-harmonizer-row-edition.beta.user.js"
+
+          if git ls-remote --exit-code --heads origin "$PUBLISH_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$PUBLISH_BRANCH"
+            git checkout -B "$PUBLISH_BRANCH" "origin/$PUBLISH_BRANCH"
+          else
+            git checkout --orphan "$PUBLISH_BRANCH"
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.beta.user.js
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISH_FILE"
+          git add "$PUBLISH_FILE"
           if git diff --cached --quiet; then
-            echo "Beta branch artifact set unchanged; skipping publish."
+            echo "beta-dist artifact unchanged; skipping publish."
           else
             git commit -m "ci(beta): publish userscript [skip ci]"
-            git push origin HEAD:beta
+            git push origin HEAD:"$PUBLISH_BRANCH"
           fi
 
   publish-stable:
@@ -139,21 +149,31 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: wme-place-harmonizer-row-edition/artifact-download
+          path: artifact-download
 
-      - name: Publish stable artifact to main branch
+      - name: Publish stable artifact to stable-dist branch
         run: |
-          mkdir -p dist
-          cp artifact-download/prod/wme-place-harmonizer-row-edition.user.js dist/
+          PUBLISH_BRANCH="stable-dist"
+          PUBLISH_FILE="dist/wme-place-harmonizer-row-edition.user.js"
+          SOURCE_FILE="../artifact-download/prod/wme-place-harmonizer-row-edition.user.js"
+
+          if git ls-remote --exit-code --heads origin "$PUBLISH_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$PUBLISH_BRANCH"
+            git checkout -B "$PUBLISH_BRANCH" "origin/$PUBLISH_BRANCH"
+          else
+            git checkout --orphan "$PUBLISH_BRANCH"
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.beta.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.user.js
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISH_FILE"
+          git add "$PUBLISH_FILE"
           if git diff --cached --quiet; then
-            echo "Main branch artifact set unchanged; skipping publish."
+            echo "stable-dist artifact unchanged; skipping publish."
           else
             git commit -m "ci(main): publish stable userscript [skip ci]"
-            git push origin HEAD:main
+            git push origin HEAD:"$PUBLISH_BRANCH"
           fi

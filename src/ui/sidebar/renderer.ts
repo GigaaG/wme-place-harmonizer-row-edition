@@ -1,7 +1,7 @@
 import type { SidebarDebugState } from "../../app/app-state";
-import { ensureScriptSidebarTab } from "./script-tab";
+import { ensureScriptSidebarTab } from "./script-tab.ts";
 import { t } from "../../i18n/runtime.ts";
-import { GOOGLE_MAPS_VALIDATION_CHECK_KEYS } from "../../types/settings";
+import { GOOGLE_MAPS_VALIDATION_CHECK_KEYS } from "../../types/settings.ts";
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -107,6 +107,8 @@ export async function renderSidebarDebugPanel(
     state.googleMapsValidationAvailability;
   const googleValidationAvailable =
     googleValidationAvailability?.enabled ?? true;
+  const showGoogleValidationChecks =
+    googleValidationAvailable && googleValidationEnabled;
 
   html += `
     <div style="margin-bottom:8px;">
@@ -120,31 +122,33 @@ export async function renderSidebarDebugPanel(
         />
         ${escapeHtml(t("sidebar.googleMapsValidation.enabled"))}
       </label>
+  `;
+
+  if (showGoogleValidationChecks) {
+    html += `
       <div style="font-size:12px;color:#666;margin:6px 0 4px 18px;">
         ${escapeHtml(t("sidebar.googleMapsValidation.checks"))}
       </div>
-  `;
-
-  for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
-    const isChecked = googleValidationChecks?.[checkKey] ?? true;
-    const isAvailable =
-      googleValidationAvailability?.checks?.[checkKey] ?? true;
-    const isDisabled = !googleValidationAvailable || !googleValidationEnabled || !isAvailable;
-    const textColor = !googleValidationAvailable || !isAvailable || !googleValidationEnabled
-      ? "#888"
-      : "#222";
-
-    html += `
-      <label style="font-size:12px;display:block;margin-left:18px;color:${textColor};">
-        <input
-          id="wmeph-row-google-validation-${escapeHtml(checkKey)}"
-          type="checkbox"
-          ${isChecked ? "checked" : ""}
-          ${isDisabled ? "disabled" : ""}
-        />
-        ${escapeHtml(t(`sidebar.googleMapsValidation.${checkKey}`))}
-      </label>
     `;
+
+    for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
+      const isChecked = googleValidationChecks?.[checkKey] ?? true;
+      const isAvailable =
+        googleValidationAvailability?.checks?.[checkKey] ?? true;
+      const textColor = !isAvailable ? "#888" : "#222";
+
+      html += `
+        <label style="font-size:12px;display:block;margin-left:18px;color:${textColor};">
+          <input
+            id="wmeph-row-google-validation-${escapeHtml(checkKey)}"
+            type="checkbox"
+            ${isChecked ? "checked" : ""}
+            ${isAvailable ? "" : "disabled"}
+          />
+          ${escapeHtml(t(`sidebar.googleMapsValidation.${checkKey}`))}
+        </label>
+      `;
+    }
   }
 
   html += `

@@ -21,6 +21,7 @@ import {
   buildExternalProviderValidationFindings,
   isExternalProviderValidationRuleId
 } from "./external-provider-validation-rules.ts";
+import { scoreExternalProviderName } from "./external-provider-suggestions.ts";
 import type {
   LinkedExternalProviderValidationParams,
   ExternalProviderValidationFinding
@@ -29,6 +30,8 @@ import {
   normalizeBusinessStatus,
   trimString
 } from "./external-provider-validation-utils.ts";
+import { getCurrentWmeLocale } from "./wme.ts";
+import { normalizeLocaleCode } from "../../i18n/locale-utils.ts";
 
 function hasEnabledValidationChecks(
   settings: LinkedExternalProviderValidationParams["settings"]
@@ -42,6 +45,152 @@ function hasEnabledValidationChecks(
   }
 
   return Object.values(settings.checks).some(Boolean);
+}
+
+const GOOGLE_PLACE_DETAILS_FIELDS = [
+  "place_id",
+  "name",
+  "formatted_address",
+  "geometry",
+  "url",
+  "types",
+  "business_status",
+  "permanently_closed",
+  "opening_hours"
+];
+
+function appendLocaleCandidates(
+  locales: string[],
+  seen: Set<string>,
+  locale: string | undefined
+): void {
+  const normalized = normalizeLocaleCode(locale);
+
+  if (!normalized) {
+    return;
+  }
+
+  const variants = [normalized];
+  const separatorIndex = normalized.indexOf("-");
+
+  if (separatorIndex > 0) {
+    variants.push(normalized.slice(0, separatorIndex));
+  }
+
+  for (const variant of variants) {
+    if (seen.has(variant)) {
+      continue;
+    }
+
+    seen.add(variant);
+    locales.push(variant);
+  }
+}
+
+function resolveGooglePlaceNameLocales(
+  params: LinkedExternalProviderValidationParams
+): string[] {
+  // Prefer explicit Google name locales from config, then fall back to the
+  // current WME locale and English. This keeps multilingual countries under
+  // config control instead of hard-coding a single language.
+  const locales: string[] = [];
+  const seen = new Set<string>();
+
+  for (const locale of params.config?.nameLocales ?? []) {
+    appendLocaleCandidates(locales, seen, locale);
+  }
+
+  appendLocaleCandidates(locales, seen, getCurrentWmeLocale());
+  appendLocaleCandidates(locales, seen, "en");
+
+  return locales;
+}
+
+interface ResolvedGooglePlaceDetails {
+  result?: any;
+  status: unknown;
+  language?: string;
+}
+
+async function runLocalizedPlaceDetailsLookup(params: {
+  service: any;
+  googleMaps: any;
+  providerId: string;
+  venueName: string;
+  locales: string[];
+}): Promise<ResolvedGooglePlaceDetails> {
+  let bestMatch:
+    | (ResolvedGooglePlaceDetails & { score: number; placeName?: string })
+    | undefined;
+  let lastStatus: unknown;
+  let notFoundStatus: unknown;
+
+  const locales = params.locales.length > 0 ? params.locales : [undefined];
+
+  for (const locale of locales) {
+    const detailsRequest: Record<string, unknown> = {
+      placeId: params.providerId,
+      fields: GOOGLE_PLACE_DETAILS_FIELDS
+    };
+
+    if (locale) {
+      detailsRequest.language = locale;
+    }
+
+    const { result, status } = await runPlaceDetailsLookup(
+      params.service,
+      detailsRequest
+    );
+
+    lastStatus = status;
+
+    if (isOkPlaceDetailsStatus(status, params.googleMaps)) {
+      const placeName = trimString(result?.name);
+      const score = placeName
+        ? scoreExternalProviderName(params.venueName, placeName)
+        : 0;
+      const currentMatch = {
+        result,
+        status,
+        language: locale,
+        placeName,
+        score
+      };
+
+      if (!bestMatch || currentMatch.score > bestMatch.score) {
+        bestMatch = currentMatch;
+      }
+
+      if (currentMatch.score >= 1) {
+        break;
+      }
+    } else if (
+      isNotFoundPlaceDetailsStatus(status, params.googleMaps) &&
+      notFoundStatus === undefined
+    ) {
+      notFoundStatus = status;
+    }
+  }
+
+  if (bestMatch) {
+    return {
+      result: bestMatch.result,
+      status: bestMatch.status,
+      language: bestMatch.language
+    };
+  }
+
+  if (notFoundStatus !== undefined) {
+    return {
+      result: undefined,
+      status: notFoundStatus
+    };
+  }
+
+  return {
+    result: undefined,
+    status: lastStatus
+  };
 }
 
 export { buildExternalProviderValidationFindings, isExternalProviderValidationRuleId };
@@ -100,6 +249,7 @@ export async function validateLinkedExternalProviders(
   const normalizedCurrentOpeningHours = normalizeCurrentOpeningHours(
     params.currentOpeningHours ?? []
   );
+  const googleNameLocales = resolveGooglePlaceNameLocales(params);
 
   logger.info(
     `Validating ${uniqueProviderIds.length} linked external provider(s) for venue "${params.venueName}"` +
@@ -115,19 +265,12 @@ export async function validateLinkedExternalProviders(
   for (const providerId of uniqueProviderIds) {
     logger.info(`Validating linked external provider ${providerId}`);
 
-    const { result, status } = await runPlaceDetailsLookup(service, {
-      placeId: providerId,
-      fields: [
-        "place_id",
-        "name",
-        "formatted_address",
-        "geometry",
-        "url",
-        "types",
-        "business_status",
-        "permanently_closed",
-        "opening_hours"
-      ]
+    const { result, status, language } = await runLocalizedPlaceDetailsLookup({
+      service,
+      googleMaps,
+      providerId,
+      venueName: params.venueName,
+      locales: googleNameLocales
     });
 
     let findings: ExternalProviderValidationFinding[] = [];
@@ -152,7 +295,7 @@ export async function validateLinkedExternalProviders(
       );
 
       logger.info(
-        `Linked provider ${providerId} resolved: name=${trimString(result?.name) ?? "none"}, status=${normalizeBusinessStatus(result?.business_status) ?? (result?.permanently_closed ? "CLOSED_PERMANENTLY" : "none")}, distance=${distanceMeters ?? "n/a"}, types=${Array.isArray(result?.types) ? result.types.join(",") : "none"}, openingHours=${googleOpeningHours ? googleOpeningHours.length : "unsupported"}`
+        `Linked provider ${providerId} resolved: language=${language ?? "default"}, name=${trimString(result?.name) ?? "none"}, status=${normalizeBusinessStatus(result?.business_status) ?? (result?.permanently_closed ? "CLOSED_PERMANENTLY" : "none")}, distance=${distanceMeters ?? "n/a"}, types=${Array.isArray(result?.types) ? result.types.join(",") : "none"}, openingHours=${googleOpeningHours ? googleOpeningHours.length : "unsupported"}`
       );
 
       findings = buildExternalProviderValidationFindings(

@@ -96,6 +96,28 @@ function validateGoogleMapsValidationConfig(
     }
   }
 
+  if (value.nameLocales !== undefined) {
+    if (!Array.isArray(value.nameLocales)) {
+      throw new Error(
+        `Config googleMapsValidation.nameLocales must be an array: ${path}`
+      );
+    }
+
+    if (value.nameLocales.length === 0) {
+      throw new Error(
+        `Config googleMapsValidation.nameLocales must contain at least one locale: ${path}`
+      );
+    }
+
+    for (const [index, locale] of value.nameLocales.entries()) {
+      if (!hasNonEmptyString(locale)) {
+        throw new Error(
+          `Config googleMapsValidation.nameLocales[${index}] must be a non-empty string: ${path}`
+        );
+      }
+    }
+  }
+
   if (value.severity === undefined) {
     return;
   }

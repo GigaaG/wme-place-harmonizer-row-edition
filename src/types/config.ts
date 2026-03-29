@@ -81,6 +81,7 @@ export interface GoogleMapsValidationConfig {
   enabled?: boolean;
   checks?: Partial<GoogleMapsValidationChecks>;
   severity?: Partial<Record<GoogleMapsValidationCheckKey, IssueSeverity>>;
+  nameLocales?: string[];
 }
 
 export interface HarmonizerConfig {

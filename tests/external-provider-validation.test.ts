@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { buildExternalProviderValidationFindings } from "../src/integration/sdk/external-provider-validation.ts";
+import {
+  buildExternalProviderValidationFindings,
+  validateLinkedExternalProviders
+} from "../src/integration/sdk/external-provider-validation.ts";
 
 function getSingleFinding(ruleId: string, findings: ReturnType<typeof buildExternalProviderValidationFindings>) {
   const finding = findings.find((entry) => entry.issue.ruleId === ruleId);
@@ -11,6 +14,19 @@ function getSingleFinding(ruleId: string, findings: ReturnType<typeof buildExter
 function runTest(name: string, fn: () => void): void {
   try {
     fn();
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    console.error(`FAIL ${name}`);
+    throw error;
+  }
+}
+
+async function runAsyncTest(
+  name: string,
+  fn: () => Promise<void>
+): Promise<void> {
+  try {
+    await fn();
     console.log(`PASS ${name}`);
   } catch (error) {
     console.error(`FAIL ${name}`);
@@ -440,3 +456,120 @@ runTest("honors config-driven severities for Google validation findings", () => 
 
   assert.equal(finding.issue.severity, "warning");
 });
+
+await runAsyncTest(
+  "requests linked Google place details in the configured locale",
+  async () => {
+    const hostWindow = globalThis as typeof globalThis & {
+      window?: any;
+      document?: any;
+      };
+      const previousWindow = hostWindow.window;
+      const previousDocument = hostWindow.document;
+      const capturedRequests: Record<string, unknown>[] = [];
+      const localName = "Novotel Brussels off Grand Place";
+      const frenchName = "Novotel Brussels";
+
+      class FakePlacesService {
+        constructor(_container: unknown) {
+          // The validation path only needs a constructible PlacesService.
+      }
+
+      getDetails(
+        request: Record<string, unknown>,
+        callback: (result: any, status: unknown) => void
+      ): void {
+        capturedRequests.push(request);
+
+        const requestedLanguage =
+          typeof request.language === "string" ? request.language : "";
+        const resolvedName = requestedLanguage.startsWith("nl")
+          ? localName
+          : requestedLanguage.startsWith("fr")
+            ? frenchName
+            : requestedLanguage.startsWith("de")
+              ? ""
+              : localName;
+
+        callback(
+          {
+            place_id: "provider-localized",
+            name: resolvedName,
+            formatted_address: "Lucasbolwerk 24, Utrecht",
+            geometry: {
+              location: {
+                lat: 52.09074,
+                lng: 5.12142
+              }
+            }
+          },
+          "OK"
+        );
+      }
+    }
+
+    hostWindow.window = {
+      google: {
+        maps: {
+          places: {
+            PlacesService: FakePlacesService,
+            PlacesServiceStatus: {
+              OK: "OK",
+              NOT_FOUND: "NOT_FOUND",
+              INVALID_REQUEST: "INVALID_REQUEST",
+              ZERO_RESULTS: "ZERO_RESULTS"
+            }
+          }
+        }
+      }
+    };
+    hostWindow.document = {
+      body: {
+        appendChild() {
+          return undefined;
+        }
+      },
+      createElement() {
+        return { style: {} };
+      }
+    };
+
+    try {
+      const validation = await validateLinkedExternalProviders({
+        venueName: localName,
+        externalProviderIds: ["provider-localized"],
+        venue: {
+          geometry: {
+            type: "Point",
+            coordinates: [5.12142, 52.09074]
+          }
+        },
+        currentCategories: [],
+          currentOpeningHours: [],
+          settings: {
+            enabled: true,
+            checks: {
+              notFound: true,
+            closed: true,
+            locationDrift: true,
+            nameMismatch: true,
+            category: true,
+              openingHours: true
+            }
+          },
+          config: {
+            nameLocales: ["fr", "nl", "de"]
+          }
+        });
+
+        assert.ok(capturedRequests.length >= 2);
+        assert.equal(capturedRequests[0].language, "fr");
+        assert.ok(capturedRequests.some((request) => request.language === "nl"));
+        assert.equal(validation.issues.length, 0);
+        assert.equal(validation.proposals.length, 0);
+      } finally {
+        hostWindow.window = previousWindow;
+        hostWindow.document = previousDocument;
+    }
+  }
+);

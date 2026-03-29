@@ -98,6 +98,26 @@ runTest("config can override Google validation severities", () => {
   assert.equal(severities.openingHours, "error");
 });
 
+runTest("config can define ordered Google validation name locales", () => {
+  const config = validateConfigFile(
+    {
+      id: "be",
+      type: "country-config",
+      version: 1,
+      googleMapsValidation: {
+        nameLocales: ["nl", "fr", "de"]
+      }
+    },
+    "config/countries/be.json"
+  );
+
+  assert.deepEqual(config.googleMapsValidation?.nameLocales, [
+    "nl",
+    "fr",
+    "de"
+  ]);
+});
+
 runTest("config loader rejects invalid Google validation config", () => {
   assert.throws(
     () =>
@@ -115,6 +135,24 @@ runTest("config loader rejects invalid Google validation config", () => {
         "config/countries/nl.json"
       ),
     /Config googleMapsValidation\.checks\.openingHours must be a boolean/
+  );
+});
+
+runTest("config loader rejects invalid Google validation name locales", () => {
+  assert.throws(
+    () =>
+      validateConfigFile(
+        {
+          id: "be",
+          type: "country-config",
+          version: 1,
+          googleMapsValidation: {
+            nameLocales: ["nl", ""]
+          }
+        },
+        "config/countries/be.json"
+      ),
+    /Config googleMapsValidation\.nameLocales\[1\] must be a non-empty string/
   );
 });
 

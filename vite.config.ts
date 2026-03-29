@@ -21,7 +21,12 @@ function buildUserscriptBanner(): string {
 // @version      ${packageJson.version}
 // @description  ${packageJson.description ?? "WME Place Harmonizer ROW Edition"}
 // @author       Contributors
-// @match        https://www.waze.com/*editor*
+// @include      https://www.waze.com/editor*
+// @include      https://www.waze.com/*/editor*
+// @include      https://beta.waze.com/editor*
+// @include      https://beta.waze.com/*/editor*
+// @exclude      https://www.waze.com/user*
+// @exclude      https://www.waze.com/*/user*
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com

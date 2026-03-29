@@ -84,34 +84,96 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish beta artifact to beta branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+  publish-beta:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wme-place-harmonizer-row-edition
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          path: wme-place-harmonizer-row-edition
+
+      - name: Download verified build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: userscript-builds
+          path: artifact-download
+
+      - name: Publish beta artifact to beta-dist branch
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.beta.user.js
-          if git diff --cached --quiet; then
-            echo "Beta branch artifact set unchanged; skipping publish."
+          PUBLISH_BRANCH="beta-dist"
+          PUBLISH_FILE="dist/wme-place-harmonizer-row-edition.user.js"
+          SOURCE_FILE="../artifact-download/beta/wme-place-harmonizer-row-edition.beta.user.js"
+
+          if git ls-remote --exit-code --heads origin "$PUBLISH_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$PUBLISH_BRANCH"
+            git checkout -B "$PUBLISH_BRANCH" "origin/$PUBLISH_BRANCH"
           else
-            git commit -m "chore: publish beta userscript [skip ci]"
-            git push origin HEAD:beta
+            git checkout --orphan "$PUBLISH_BRANCH"
           fi
 
-      - name: Publish stable artifact to main branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.beta.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.user.js
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISH_FILE"
+          git add "$PUBLISH_FILE"
           if git diff --cached --quiet; then
-            echo "Main branch artifact set unchanged; skipping publish."
+            echo "beta-dist artifact unchanged; skipping publish."
           else
-            git commit -m "chore: publish stable userscript [skip ci]"
-            git push origin HEAD:main
+            git commit -m "ci(beta): publish userscript [skip ci]"
+            git push origin HEAD:"$PUBLISH_BRANCH"
+          fi
+
+  publish-stable:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wme-place-harmonizer-row-edition
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          path: wme-place-harmonizer-row-edition
+
+      - name: Download verified build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: userscript-builds
+          path: artifact-download
+
+      - name: Publish stable artifact to stable-dist branch
+        run: |
+          PUBLISH_BRANCH="stable-dist"
+          PUBLISH_FILE="dist/wme-place-harmonizer-row-edition.user.js"
+          SOURCE_FILE="../artifact-download/prod/wme-place-harmonizer-row-edition.user.js"
+
+          if git ls-remote --exit-code --heads origin "$PUBLISH_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$PUBLISH_BRANCH"
+            git checkout -B "$PUBLISH_BRANCH" "origin/$PUBLISH_BRANCH"
+          else
+            git checkout --orphan "$PUBLISH_BRANCH"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISH_FILE"
+          git add "$PUBLISH_FILE"
+          if git diff --cached --quiet; then
+            echo "stable-dist artifact unchanged; skipping publish."
+          else
+            git commit -m "ci(main): publish stable userscript [skip ci]"
+            git push origin HEAD:"$PUBLISH_BRANCH"
           fi

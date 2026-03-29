@@ -22,7 +22,7 @@ Before opening the release PR, confirm all of the following:
 
 - [ ] `package.json` already contains the intended stable version
 - [ ] `beta` CI is green
-- [ ] the beta userscript has been republished to the `beta` branch artifact path
+- [ ] the beta userscript has been published to the `beta-dist` artifact branch
 - [ ] beta testers have accepted the current beta build
 - [ ] there are no known release-blocking issues left open
 
@@ -34,6 +34,7 @@ Open a pull request from `beta` to `main` and confirm:
 - [ ] the PR description summarizes the release scope and notable changes
 - [ ] the PR description mentions any matching data-repo changes if the release depends on them
 - [ ] the PR description notes any exceptional post-merge follow-up if the release needs it
+- [ ] required PR verification checks are configured and passing before merge
 
 ## Pre-merge verification
 
@@ -60,13 +61,13 @@ When the PR is approved:
 - [ ] merge `beta` into `main`
 - [ ] confirm the `main` branch CI workflow passes
 - [ ] confirm the production userscript artifact is available from the workflow run
-- [ ] confirm CI republished `dist/wme-place-harmonizer-row-edition.user.js` back to `main`
+- [ ] confirm CI published `dist/wme-place-harmonizer-row-edition.user.js` to `stable-dist`
 
 ## Greasy Fork verification
 
 After `main` is green:
 
-- [ ] confirm Greasy Fork picked up the new stable build from `main`
+- [ ] confirm Greasy Fork picked up the new stable build from `stable-dist`
 - [ ] confirm the Greasy Fork version matches `package.json`
 - [ ] confirm the Greasy Fork script page shows the expected release text and metadata
 

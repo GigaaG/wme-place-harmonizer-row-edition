@@ -1,3 +1,6 @@
+import type { GoogleMapsValidationAvailability } from "../settings/google-maps-validation-policy";
+import type { GoogleMapsValidationSettings } from "../types/settings";
+
 export interface SidebarDebugState {
   scriptName: string;
   dataChannel: string;
@@ -16,6 +19,8 @@ export interface SidebarDebugState {
   };
   highlightsEnabled?: boolean;
   autoScanVisibleVenues?: boolean;
+  googleMapsValidation?: GoogleMapsValidationSettings;
+  googleMapsValidationAvailability?: GoogleMapsValidationAvailability;
 }
 
 let sidebarDebugState: SidebarDebugState | null = null;

@@ -17,13 +17,13 @@ export function fetchJson<T>(url: string): Promise<T> {
         try {
           const parsed = JSON.parse(response.responseText) as T;
           resolve(parsed);
-        } catch (error) {
+        } catch (_error) {
           reject(
             new Error(`Invalid JSON received from ${url}`)
           );
         }
       },
-      onerror: (error) => {
+      onerror: (_error) => {
         reject(new Error(`Network error while loading ${url}`));
       }
     });

@@ -1,4 +1,5 @@
 import type { AddressPolicy, PresenceRequirement } from "./address";
+import type { LocalizedTextList } from "./i18n";
 
 export type GeometryType = "point" | "polygon";
 
@@ -43,9 +44,11 @@ export interface ChainStandardDefinition {
 export interface ChainPolicyDefinition {
   geometry?: GeometryPolicy;
   lockLevel?: number;
+  cityInVenueName?: boolean;
   phone?: PresenceRequirement;
   url?: PresenceRequirement;
   openingHours?: PresenceRequirement;
+  navigationPoints?: PresenceRequirement;
   externalProviderIds?: PresenceRequirement;
   services?: ServicePolicy;
   address?: AddressPolicy;
@@ -70,6 +73,7 @@ export interface ChainRecord {
   policy?: ChainPolicyDefinition;
   scope?: ChainScopeDefinition;
   meta?: ChainMetaDefinition;
+  editorNotes?: LocalizedTextList;
 }
 
 export interface ChainDataset {

@@ -1,5 +1,6 @@
 import type { PlaceIssue } from "../types/issue";
 import type { PlaceProposal } from "../types/proposal";
+import { t } from "../i18n/runtime.ts";
 
 const APPLY_SUPPORTED_FIELDS = new Set([
   "name",
@@ -17,6 +18,14 @@ function readInteger(value: unknown): number | undefined {
 
 function isPresenceExpectation(value: unknown): value is "present" | "absent" {
   return value === "present" || value === "absent";
+}
+
+function buildProposalId(issue: PlaceIssue, suffix?: string): string {
+  return [
+    issue.groupKey ?? issue.field,
+    issue.ruleId ?? "no-rule",
+    suffix ?? String(issue.expectedValue ?? issue.currentValue ?? "")
+  ].join("::");
 }
 
 export function generateProposals(
@@ -41,9 +50,12 @@ export function generateProposals(
 
       if (issue.ruleId?.startsWith("services.required.") || issue.ruleId?.startsWith("services.recommended.")) {
         proposals.push({
+          id: buildProposalId(issue, serviceName),
           field: "services",
+          groupKey: issue.groupKey,
           currentValue: issue.currentValue,
           proposedValue: serviceName,
+          displayProposedValue: serviceName,
           reason: issue.message,
           issueRuleId: issue.ruleId,
           isApplySupported: true,
@@ -58,9 +70,12 @@ export function generateProposals(
         issue.ruleId?.startsWith("services.forbidden.")
       ) {
         proposals.push({
+          id: buildProposalId(issue, serviceName),
           field: "services",
+          groupKey: issue.groupKey,
           currentValue: issue.currentValue,
           proposedValue: serviceName,
+          displayProposedValue: serviceName,
           reason: issue.message,
           issueRuleId: issue.ruleId,
           isApplySupported: true,
@@ -69,6 +84,25 @@ export function generateProposals(
         });
         continue;
       }
+    }
+
+    if (issue.field === "aliases" && typeof issue.expectedValue === "string") {
+      const aliasName = issue.expectedValue;
+
+      proposals.push({
+        id: buildProposalId(issue, aliasName),
+        field: "aliases",
+        groupKey: issue.groupKey,
+        currentValue: issue.currentValue,
+        proposedValue: aliasName,
+        displayProposedValue: aliasName,
+        reason: issue.message,
+        issueRuleId: issue.ruleId,
+        isApplySupported: true,
+        actionType: "add-alias",
+        aliasName
+      });
+      continue;
     }
 
     //
@@ -80,15 +114,18 @@ export function generateProposals(
 
       const isPolygonToPoint = current === "polygon" && expected === "point";
       const isPointToPolygon = current === "point" && expected === "polygon";
+      const isApplySupported = isPolygonToPoint || isPointToPolygon;
 
       proposals.push({
+        id: buildProposalId(issue),
         field: "geometry",
+        groupKey: issue.groupKey,
         currentValue: current,
         proposedValue: expected,
         reason: issue.message,
         issueRuleId: issue.ruleId,
-        isApplySupported: isPolygonToPoint,
-        actionType: isPolygonToPoint ? "set-field" : "manual-only"
+        isApplySupported,
+        actionType: isApplySupported ? "set-field" : "manual-only"
       });
       continue;
     }
@@ -118,12 +155,21 @@ export function generateProposals(
         editorLockLevel < recommendedLockLevel;
       const reason = isCappedByEditor
         ? canApply
-          ? `${issue.message}. Apply will raise the venue to ${appliedLockLevel}, capped by your editor lock level ${editorLockLevel}.`
-          : `${issue.message}. Your editor lock level ${editorLockLevel} cannot raise this venue further.`
+          ? t("proposal.lockLevel.cappedRaise", {
+              issueMessage: issue.message,
+              lockLevel: appliedLockLevel,
+              editorLockLevel
+            })
+          : t("proposal.lockLevel.cappedCannotRaise", {
+              issueMessage: issue.message,
+              editorLockLevel
+            })
         : issue.message;
 
       proposals.push({
+        id: buildProposalId(issue),
         field: "lockLevel",
+        groupKey: issue.groupKey,
         currentValue: currentLockLevel,
         proposedValue: canApply ? appliedLockLevel : recommendedLockLevel,
         reason,
@@ -143,7 +189,9 @@ export function generateProposals(
 
     if (issue.expectedValue !== undefined) {
       proposals.push({
+        id: buildProposalId(issue),
         field: issue.field,
+        groupKey: issue.groupKey,
         currentValue: issue.currentValue,
         proposedValue: issue.expectedValue,
         reason: issue.message,

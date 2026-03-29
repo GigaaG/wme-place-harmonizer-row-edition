@@ -12,10 +12,19 @@ export class SettingsManager {
 
     try {
       const parsed = JSON.parse(raw) as Partial<UserSettings>;
+      const defaults = getDefaultSettings();
 
       return {
-        ...getDefaultSettings(),
-        ...parsed
+        ...defaults,
+        ...parsed,
+        googleMapsValidation: {
+          ...defaults.googleMapsValidation,
+          ...parsed.googleMapsValidation,
+          checks: {
+            ...defaults.googleMapsValidation.checks,
+            ...parsed.googleMapsValidation?.checks
+          }
+        }
       };
     } catch {
       return getDefaultSettings();

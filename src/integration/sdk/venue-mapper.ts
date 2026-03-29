@@ -30,24 +30,26 @@ function mapOpeningHours(openingHours: any[] | undefined): OpeningHourDefinition
     }));
 }
 
+function mapNavigationPointCount(venue: any): number | undefined {
+  const candidates = [venue?.navigationPoints, venue?.navigationPoint];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((point) => point !== null && point !== undefined).length;
+    }
+
+    if (candidate && typeof candidate === "object") {
+      return 1;
+    }
+  }
+
+  return undefined;
+}
+
 function readNumericValue(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
-}
-
-function readNumericMethodValue(target: any, methodName: string): number | undefined {
-  const method = target?.[methodName];
-
-  if (typeof method !== "function") {
-    return undefined;
-  }
-
-  try {
-    return readNumericValue(method.call(target));
-  } catch {
-    return undefined;
-  }
 }
 
 function readStringValue(value: unknown): string | undefined {
@@ -75,70 +77,31 @@ function firstString(...candidates: unknown[]): string | undefined {
 }
 
 function mapLockLevel(venue: any): number | undefined {
-  const directCandidates = [
-    readNumericValue(venue?.lockLevel),
-    readNumericValue(venue?.attributes?.lockLevel),
-    readNumericMethodValue(venue, "getLockLevel")
-  ];
+  const lockRank = readNumericValue(venue?.lockRank);
 
-  for (const candidate of directCandidates) {
-    if (
-      typeof candidate === "number" &&
-      Number.isInteger(candidate) &&
-      candidate >= 1
-    ) {
-      return candidate;
-    }
-  }
-
-  const lockRankCandidates = [
-    readNumericValue(venue?.lockRank),
-    readNumericValue(venue?.attributes?.lockRank),
-    readNumericMethodValue(venue, "getLockRank")
-  ];
-
-  for (const candidate of lockRankCandidates) {
-    if (
-      typeof candidate === "number" &&
-      Number.isInteger(candidate) &&
-      candidate >= 0
-    ) {
-      return candidate + 1;
-    }
-  }
-
-  return undefined;
+  return typeof lockRank === "number" &&
+    Number.isInteger(lockRank) &&
+    lockRank >= 0
+    ? lockRank + 1
+    : undefined;
 }
 
 function mapCategories(venue: any): string[] {
-  return normalizeCategoryKeys([
-    ...(Array.isArray(venue?.categories) ? venue.categories : []),
-    ...(Array.isArray(venue?.attributes?.categories)
-      ? venue.attributes.categories
-      : []),
-    venue?.primaryCategory,
-    venue?.category,
-    venue?.attributes?.primaryCategory,
-    venue?.attributes?.category
-  ]);
+  return normalizeCategoryKeys(
+    Array.isArray(venue?.categories) ? venue.categories : []
+  );
 }
 
 function getVenueAddressFromSdk(venue: any): any | undefined {
   const sdk = getWmeSdk();
-  const venueId = venue?.id ?? venue?.attributes?.id;
+  const venueId = readStringValue(venue?.id);
 
-  if (!sdk || venueId === undefined || venueId === null) {
+  if (!sdk || !venueId) {
     return undefined;
   }
 
   try {
     return sdk.DataModel?.Venues?.getAddress?.({ venueId });
-  } catch {
-    // Fall through to compatibility fallback.
-  }
-
-  try {
-    return sdk.DataModel?.Venues?.getAddress?.(venueId);
   } catch {
     return undefined;
   }
@@ -146,52 +109,17 @@ function getVenueAddressFromSdk(venue: any): any | undefined {
 
 function mapAddress(venue: any): PlaceAddress | undefined {
   const sdkAddress = getVenueAddressFromSdk(venue);
+  if (!sdkAddress || sdkAddress.isEmpty) {
+    return undefined;
+  }
 
   const address = {
-    city: firstString(
-      sdkAddress?.city?.name,
-      sdkAddress?.cityName,
-      sdkAddress?.city,
-      venue?.address?.city?.name,
-      venue?.address?.cityName,
-      venue?.address?.city,
-      venue?.attributes?.address?.city?.name,
-      venue?.attributes?.address?.cityName,
-      venue?.attributes?.address?.city,
-      venue?.city?.name,
-      venue?.city,
-      venue?.attributes?.city?.name,
-      venue?.attributes?.city
-    ),
+    city: readStringValue(sdkAddress.city?.name),
     street: firstString(
-      sdkAddress?.street?.name,
-      sdkAddress?.street?.englishName,
-      sdkAddress?.streetName,
-      sdkAddress?.street,
-      venue?.address?.street?.name,
-      venue?.address?.streetName,
-      venue?.address?.street,
-      venue?.attributes?.address?.street?.name,
-      venue?.attributes?.address?.streetName,
-      venue?.attributes?.address?.street,
-      venue?.street?.name,
-      venue?.street,
-      venue?.attributes?.street?.name,
-      venue?.attributes?.street
+      sdkAddress.street?.name,
+      sdkAddress.street?.englishName
     ),
-    houseNumber: firstString(
-      sdkAddress?.houseNumber,
-      sdkAddress?.house_number,
-      sdkAddress?.housenumber,
-      venue?.address?.houseNumber,
-      venue?.address?.housenumber,
-      venue?.address?.house_number,
-      venue?.attributes?.address?.houseNumber,
-      venue?.attributes?.address?.housenumber,
-      venue?.attributes?.address?.house_number,
-      venue?.houseNumber,
-      venue?.attributes?.houseNumber
-    )
+    houseNumber: readStringValue(sdkAddress.houseNumber)
   };
 
   return address.city || address.street || address.houseNumber
@@ -215,6 +143,7 @@ export function mapVenueToPlaceLike(venue: any): PlaceLike {
     services: venue.services ?? [],
 
     openingHours: mapOpeningHours(venue.openingHours),
+    navigationPointCount: mapNavigationPointCount(venue),
     externalProviderIds: venue.externalProviderIds ?? [],
     address: mapAddress(venue),
 

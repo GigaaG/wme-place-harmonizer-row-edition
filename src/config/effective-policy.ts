@@ -2,6 +2,7 @@ import type { ChainPolicyDefinition, GeometryPolicy, ServicePolicy } from "../ty
 import type { AddressPolicy, PresenceRequirement } from "../types/address";
 import type { CategoryStandard } from "../types/config";
 import type { EffectivePlacePolicy } from "../types/policy";
+import { mergeLocalizedTextLists } from "../i18n/locale-utils.ts";
 
 function mergeGeometryPolicy(
   base?: GeometryPolicy,
@@ -111,6 +112,7 @@ function mergeCategoryStandardIntoPolicy(
     ...current,
     geometry: mergeGeometryPolicy(current.geometry, standard.geometry),
     lockLevel: standard.lockLevel ?? current.lockLevel,
+    cityInVenueName: standard.cityInVenueName ?? current.cityInVenueName,
     phone: mergePresenceRequirement(
       current.phone,
       standard.phone,
@@ -138,6 +140,10 @@ function mergeCategoryStandardIntoPolicy(
         trueValue: "required"
       })
     ),
+    navigationPoints: mergePresenceRequirement(
+      current.navigationPoints,
+      standard.navigationPoints
+    ),
     externalProviderIds: mergePresenceRequirement(
       current.externalProviderIds,
       standard.externalProviderIds,
@@ -149,7 +155,8 @@ function mergeCategoryStandardIntoPolicy(
       })
     ),
     services: mergeServicePolicy(current.services, standard.services),
-    address: mergeAddressPolicy(current.address, standard.address)
+    address: mergeAddressPolicy(current.address, standard.address),
+    editorNotes: mergeLocalizedTextLists(current.editorNotes, standard.editorNotes)
   };
 }
 
@@ -165,6 +172,7 @@ function mergeChainPolicyIntoPolicy(
     ...current,
     geometry: mergeGeometryPolicy(current.geometry, chainPolicy.geometry),
     lockLevel: chainPolicy.lockLevel ?? current.lockLevel,
+    cityInVenueName: chainPolicy.cityInVenueName ?? current.cityInVenueName,
     phone: mergePresenceRequirement(
       current.phone,
       chainPolicy.phone,
@@ -191,6 +199,10 @@ function mergeChainPolicyIntoPolicy(
         key: "requireOpeningHours",
         trueValue: "required"
       })
+    ),
+    navigationPoints: mergePresenceRequirement(
+      current.navigationPoints,
+      chainPolicy.navigationPoints
     ),
     externalProviderIds: mergePresenceRequirement(
       current.externalProviderIds,

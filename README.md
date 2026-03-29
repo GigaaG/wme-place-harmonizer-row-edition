@@ -1,214 +1,139 @@
 # WME Place Harmonizer ROW Edition
 
-WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Editor (WME) focused on harmonizing and validating Places / POIs on the ROW (Rest of World) server.
+WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Editor (WME). It helps editors review places against shared standards, see what looks wrong, and apply selected fixes manually.
 
-The script is designed to be:
+## For Users
 
-- config-first
-- community-configurable
-- GitHub-managed
-- SDK-first
-- safe by default
+This script adds harmonization checks to WME for the ROW environment. It is designed to support place maintenance without making automatic edits on the editor's behalf.
 
-It analyzes selected venues, applies community and chain standards, highlights visible venues on the map, and proposes fixes that can be applied selectively.
+In the current implementation, the script:
 
----
+- analyzes the selected venue in WME
+- matches venues against configured chains and category standards
+- shows issues and proposals in the feature editor and the script sidebar
+- scans visible venues on the map and highlights them by status
+- lets the editor apply supported proposals selectively
 
-## Project status
+The script is data-driven. It reads manifests, config, chains, locales, and reference data from the companion repository:
 
-This repository currently contains the **code MVP**.
+- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
 
-The code MVP includes:
+The data repository also publishes exception datasets, but the current userscript runtime does not consume them yet.
 
-- WME SDK integration
-- selected venue analysis
+This script is intended for Waze editors and maintainers who want help reviewing place data against shared standards before making manual edits.
+
+## Main Features
+
+- venue analysis for the current selection
 - chain matching
-- category-based standards
-- issue detection
-- proposal generation
-- selective apply flow for supported fields
-- feature editor integration
-- script sidebar tab
-- visible venue scanning
-- map highlights
-- auto scan on pan / zoom with toggle
+- category-based policy checks
+- phone and URL formatting validation where configured
+- visible-venue scan and highlight output
+- local whitelist support for suppressing specific issues
 
-The separate data repository is still in progress and will receive its own MVP milestone later.
+## Installation and Usage
 
----
+You need:
 
-## Repository structure
+- access to Waze Map Editor
+- Tampermonkey in your browser
+- a built `.user.js` file from this repository or a published release artifact
 
-```text
-src/        TypeScript source code
-docs/       Project design and architecture documents
-dist/       Built userscript output
-```
+Install the script:
 
-### Important files
+1. Obtain a built userscript file.
+   - `dist/wme-place-harmonizer-row-edition.user.js` for the production build
+   - `dist/wme-place-harmonizer-row-edition.beta.user.js` for the beta build
+   - `dist/wme-place-harmonizer-row-edition.dev.user.js` for the development build
+2. Open the file in Tampermonkey.
+3. Install or update the script.
+4. Open WME and wait for the userscript to initialize.
 
-- package.json
-- tsconfig.json
-- vite.config.ts
+Use the script:
 
-## Related repository
+1. Select a place in WME.
+2. Review the analysis shown in the feature editor and sidebar.
+3. Inspect the reported issues and proposed values.
+4. Select only the changes you want.
+5. Apply the selected fixes.
 
-This project uses a separate public data repository for configuration, chains, exceptions and locales:
+The script also supports scanning visible venues and highlighting them by severity.
 
-[wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
+## Notes
 
-The code and data are intentionally separated.
+- The script does not make automatic edits.
+- Only supported proposal types can be applied from the UI.
+- Some edits still require manual work in WME.
+- Country-specific config and chain overlays are optional; when they fail to load, the runtime falls back to global data and logs the reason.
+- The UI locale follows the WME SDK locale first, then the data-side default locale, then English.
 
-## Requirements
+## Stable, Beta, and Development Channels
 
-To build or work on this repository you need:
+Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Beta and development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
+
+## For Developers
+
+Prerequisites:
 
 - Node.js
 - npm
 - Tampermonkey
-- access to Waze Map Editor
+- access to WME for runtime testing
 
-### Install dependencies
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-### Development build
-
-```bash
-npm run build:dev
-```
-
-or watch mode:
+Common commands:
 
 ```bash
 npm run dev
-```
-
-### Production build
-
-```bash
+npm run build:dev
+npm run build:beta
 npm run build:prod
+npm run lint
+npm run check
+npm run test
 ```
 
-The built userscript is written to:
+Build outputs:
 
-`dist/wme-place-harmonizer-row-edition.user.js`
+- `npm run build:dev` writes `dist/wme-place-harmonizer-row-edition.dev.user.js`
+- `npm run build:beta` writes `dist/wme-place-harmonizer-row-edition.beta.user.js`
+- `npm run build:prod` writes `dist/wme-place-harmonizer-row-edition.user.js`
 
-## Load into Tampermonkey
+`npm run build:beta` and `npm run build:prod` stamp beta and stable artifacts from the current development build output, so run `npm run build:dev` first.
 
-1. Build the project
-2. Open the generated file in `dist/`
-3. Install or update it in Tampermonkey
-4. Open Waze Map Editor
+Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
 
-## Current MVP features
+Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. On pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch. On pushes to `main`, CI republishes `dist/wme-place-harmonizer-row-edition.user.js` back to `main` so Greasy Fork can sync from a fixed stable artifact URL.
 
-### Feature editor
+This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 
-- selected venue analysis
-- issue cards
-- lock level recommendation issues
-- suggestions / proposals
-- apply selected fixes for supported fields
-- venue-only rendering
+- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
 
-### Script tab
+When behavior, contracts, or user-facing text change here, check whether the data repository also needs updates. That commonly includes locale files, locale templates, manifests, config, chains, and locale-keyed `editorNotes`.
 
-- runtime status
-- manifest/config/chains info
-- reload data
-- auto scan toggle
-- visible venue scan summary
+Recommended local workflow:
 
-### Map tools
+1. Install dependencies with `npm install`.
+2. Build a development userscript with `npm run build:dev` or `npm run dev`.
+3. Load the generated userscript into Tampermonkey.
+4. Test the script in WME.
+5. Run `npm run check` before opening a pull request.
+6. Bump `package.json` to the version you plan to release before starting a beta cycle.
+7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and republish the beta userscript that Tampermonkey tracks. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish or sync the stable artifact through Greasy Fork.
 
-- scan visible venues
-- highlight visible venues
-- severity-based colors
-- auto scan on pan and zoom
+Further documentation:
 
-## Supported apply fields in MVP
-
-The MVP currently supports selective apply for a limited set of fields.
-
-### Examples include
-
-- name
-- lock level
-- phone
-- url
-- services
-- opening hours
-
-### Some fields are intentionally not automatically applied yet, such as
-
-- certain geometry transitions
-- external provider ids
-- fields requiring manual editor interaction
-
-## Design principles
-
-- no automatic changes without explicit user action
-- community-driven standards via GitHub data files
-- global defaults with local overrides
-- chains and non-chain venues both supported
-- safe fallbacks and runtime resilience
-
-## Key design documents
-
-See the `docs/` folder for the functional and technical design.
-
-Recommended starting points:
-
-- [docs/v1-scope.md](docs/v1-scope.md)
 - [docs/architecture.md](docs/architecture.md)
-- [docs/ui-flow.md](docs/ui-flow.md)
 - [docs/build-and-release.md](docs/build-and-release.md)
+- [docs/release-checklist.md](docs/release-checklist.md)
+- [docs/whitelist-model.md](docs/whitelist-model.md)
 
-## Release process for the code repository
+## License
 
-### Before a release
-
-- Make sure all intended code changes are committed
-- Run a production build
-- Test the built userscript in WME
-- Confirm the README and docs are up to date
-
-### Build for release
-
-```bash
-npm run build:prod
-```
-
-### Commit release-ready state
-
-```bash
-git add .
-git commit -m "Prepare MVP release"
-```
-
-### Create a tag
-
-Example:
-
-```bash
-git tag v0.1.0-mvp
-git push origin main
-git push origin v0.1.0-mvp
-```
-
-### Optional GitHub release
-
-After pushing the tag, create a GitHub Release from that tag and attach release notes if desired.
-
-## Notes about data
-
-The code repository is ready for an MVP tag.
-
-The data repository is intentionally versioned separately and should only receive its MVP tag when representative configuration data has been added and validated.
-
-## License / usage
-
-Add the intended license for the project here when you decide on it.
+[GNU GPL v3](LICENSE)

@@ -78,20 +78,7 @@ function resolveCountryCodeFromObject(country: any): string | undefined {
     return undefined;
   }
 
-  const candidates = [country, country.attributes];
-
-  for (const candidate of candidates) {
-    if (!candidate || typeof candidate !== "object") {
-      continue;
-    }
-
-    const resolved = resolveCountryCodeFromRecord(candidate as Record<string, unknown>);
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  return undefined;
+  return resolveCountryCodeFromRecord(country as Record<string, unknown>);
 }
 
 export function resolveCountryCodeFromCountryEntity(country: any): string | undefined {
@@ -181,92 +168,20 @@ export function resolveCountryCodeFromCountryId(countryId: unknown): string | un
 }
 
 export function resolveVenueCountryCode(venue: any): string | undefined {
-  const directCandidates = [
-    venue?.address?.country?.code,
-    venue?.address?.country?.abbr,
-    venue?.address?.country?.iso2,
-    venue?.address?.country?.iso,
-    venue?.address?.country?.alpha2,
-    venue?.address?.countryCode,
-    venue?.address?.countryId,
-    venue?.address?.countryID,
-    venue?.country?.code,
-    venue?.country?.abbr,
-    venue?.country?.iso2,
-    venue?.country?.iso,
-    venue?.country?.alpha2,
-    venue?.countryCode,
-    venue?.countryId,
-    venue?.countryID,
-    venue?.attributes?.address?.country?.code,
-    venue?.attributes?.address?.country?.abbr,
-    venue?.attributes?.address?.country?.iso2,
-    venue?.attributes?.address?.country?.iso,
-    venue?.attributes?.address?.country?.alpha2,
-    venue?.attributes?.address?.countryCode,
-    venue?.attributes?.address?.countryId,
-    venue?.attributes?.address?.countryID,
-    venue?.attributes?.country?.code,
-    venue?.attributes?.country?.abbr,
-    venue?.attributes?.country?.iso2,
-    venue?.attributes?.country?.iso,
-    venue?.attributes?.country?.alpha2,
-    venue?.attributes?.countryCode,
-    venue?.attributes?.countryId,
-    venue?.attributes?.countryID
-  ];
+  const sdk = getWmeSdk();
+  const venueId =
+    typeof venue?.id === "string" && venue.id.trim().length > 0
+      ? venue.id
+      : undefined;
 
-  for (const candidate of directCandidates) {
-    const normalized = normalizeAlphaCountryCode(candidate);
-    if (normalized) {
-      return normalized;
-    }
+  if (!sdk || !venueId) {
+    return undefined;
   }
 
-  const nestedCountryCandidates = [
-    venue?.address?.country,
-    venue?.country,
-    venue?.attributes?.address?.country,
-    venue?.attributes?.country
-  ];
-
-  for (const candidate of nestedCountryCandidates) {
-    const nestedCountry = resolveCountryCodeFromObject(candidate);
-    if (nestedCountry) {
-      return nestedCountry;
-    }
+  try {
+    const address = sdk.DataModel?.Venues?.getAddress?.({ venueId });
+    return resolveCountryCodeFromCountryEntity(address?.country);
+  } catch {
+    return undefined;
   }
-
-  const countryIdCandidates = [
-    venue?.address?.country?.id,
-    venue?.address?.country?.countryId,
-    venue?.address?.country?.countryID,
-    venue?.address?.countryId,
-    venue?.address?.countryID,
-    venue?.country?.id,
-    venue?.country?.countryId,
-    venue?.country?.countryID,
-    venue?.countryId,
-    venue?.countryID,
-    venue?.attributes?.address?.country?.id,
-    venue?.attributes?.address?.country?.countryId,
-    venue?.attributes?.address?.country?.countryID,
-    venue?.attributes?.address?.countryId,
-    venue?.attributes?.address?.countryID,
-    venue?.attributes?.country?.id,
-    venue?.attributes?.country?.countryId,
-    venue?.attributes?.country?.countryID,
-    venue?.attributes?.countryId,
-    venue?.attributes?.countryID
-  ];
-
-  for (const countryId of countryIdCandidates) {
-    const country = findCountryById(countryId);
-    const resolved = resolveCountryCodeFromObject(country);
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  return undefined;
 }

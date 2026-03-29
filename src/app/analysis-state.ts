@@ -13,6 +13,8 @@ export interface LatestAnalysisState {
   issues: PlaceIssue[];
   proposals: PlaceProposal[];
   currentServices: string[];
+  currentAliases: string[];
+  currentExternalProviderIds: string[];
   isVenueSelection: boolean;
   statusMessage?: AnalysisStatusMessage;
 }

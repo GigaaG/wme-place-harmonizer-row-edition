@@ -1,492 +1,125 @@
-# WME Place Harmonizer ROW Edition — Architecture Overview
-
-## 1. Doel van dit document
-
-Dit document beschrijft de hoofdarchitectuur van WME Place Harmonizer ROW Edition.
-
-Het doel is om vast te leggen hoe de verschillende onderdelen van het systeem samenwerken, zodat development, configuratiebeheer en toekomstige uitbreidingen op een consistente manier kunnen worden uitgevoerd.
-
-Dit document is een architectuuroverzicht op hoofdlijnen. Gedetailleerde modellen voor configuratie, manifesten, chains, whitelist, UI en build/release flow worden in aparte documenten verder uitgewerkt.
-
-## 2. Architectuurprincipes
-
-De architectuur van het project is gebaseerd op de volgende principes:
-
-- config-first
-- global defaults met lokale overrides
-- SDK-first integratie
-- WazeWrap alleen als secundaire compatibiliteits- of helperlaag
-- voorstelgestuurde harmonisatie, nooit automatische wijzigingen
-- publieke GitHub-gebaseerde configuratie zonder backend
-- veilige schema-validatie
-- robuuste caching met last-known-good fallback
-- modulaire opzet voor onderhoudbaarheid en testbaarheid
-- duidelijke scheiding tussen code en community-data
-
-## 3. Repositories
-
-Het project bestaat uit twee afzonderlijke repositories.
-
-### 3.1 Code-repo
-
-Repository:
-`wme-place-harmonizer-row-edition`
-
-Verantwoordelijkheden:
-- userscript code
-- TypeScript broncode
-- build pipeline
-- SDK en WazeWrap integratie
-- UI
-- matching engine
-- rule engine
-- proposal/apply flow
-- whitelist logic
-- caching logic
-- documentatie voor development, build en release
-
-### 3.2 Data-repo
+# WME Place Harmonizer ROW Edition Architecture
 
-Repository:
-`wme-place-harmonizer-row-data`
+This document describes the current implementation. It is intentionally limited to the architecture that exists in the checked-in code.
 
-Verantwoordelijkheden:
-- global config
-- community config
-- country config
-- optionele state config
-- chains
-- exceptions
-- locale files
-- JSON schemas
-- manifest files
-- documentatie voor community maintainers
+## System overview
 
-### 3.3 Waarom twee repositories
+The workspace consists of two repositories:
 
-Er is bewust gekozen voor één code-repo en één data-repo, omdat dit de beste balans biedt tussen onderhoudbaarheid, flexibiliteit en community-beheer.
+- `wme-place-harmonizer-row-edition`: userscript code, runtime behavior, tests, and code-side docs
+- `wme-place-harmonizer-row-data`: manifests, config, chains, locales, validation tooling, and data-side docs
 
-Voordelen:
-- script-releases blijven losgekoppeld van community-data wijzigingen
-- communities kunnen data wijzigen zonder scriptcode te veranderen
-- rollback van data is mogelijk zonder nieuwe script-release
-- gedeelde standaarden en chains kunnen centraal worden beheerd
-- DACH-achtige multi-country communities kunnen via één communityprofiel worden ondersteund
-- manifest-gestuurde caching blijft overzichtelijk
+The userscript is loaded into Waze Map Editor and uses the public WME SDK as its primary integration surface.
 
-## 4. Hoog-niveau systeembestanddelen
+## Startup flow
 
-Het systeem bestaat uit de volgende hoofdlagen:
+At startup the userscript:
 
-1. bootstrap en init
-2. editor integration layer
-3. config and data layer
-4. validation and merge layer
-5. matching layer
-6. rule engine
-7. proposal engine
-8. apply layer
-9. UI layer
-10. cache and persistence layer
-11. debug and logging layer
+1. boots through [`src/bootstrap/init.ts`](../src/bootstrap/init.ts)
+2. checks that the environment is supported
+3. loads persisted user settings from local storage
+4. loads a manifest for the active data channel
+5. resolves an initial country from the current selection, visible map context, runtime state, or fallback setting
+6. loads runtime config and chain data for that country
+7. loads the best available locale file
+8. mounts the sidebar placeholder and registers WME event listeners
 
-## 5. Runtime flow op hoofdlijnen
+The main runtime orchestration lives in [`src/app/start.ts`](../src/app/start.ts).
 
-De runtime flow is als volgt:
+## Runtime data loading
 
-1. userscript initialiseert in WME
-2. init guards controleren of WME, SDK en benodigde context beschikbaar zijn
-3. script laadt settings, manifest en benodigde configuratiebestanden
-4. configuratiebestanden worden gevalideerd
-5. runtime-config wordt samengesteld via inheritance en merge-strategieën
-6. gebruiker selecteert een place of start een scan
-7. place-context wordt opgebouwd
-8. chain matching wordt uitgevoerd
-9. rules evalueren de place binnen de actieve configuratie
-10. issues en voorstellen worden gegenereerd
-11. kaart en sidebar worden bijgewerkt
-12. gebruiker kiest optioneel welke wijzigingen toegepast mogen worden
-13. apply layer voert alleen geselecteerde wijzigingen door
-14. UI toont resultaat, eventuele fouten en debug-info
+The runtime loads data from the companion data repository through fixed paths plus a manifest:
 
-## 6. Integratielaag met WME
+- required core files:
+  - `manifest/<channel>.json`
+  - `config/global.json`
+  - `chains/global.json`
+- optional overlays:
+  - `config/countries/<country>.json`
+  - `chains/countries/<country>.json`
+- locale files listed in the manifest
 
-### 6.1 SDK-first benadering
+Current behavior:
 
-De publieke WME SDK is de primaire integratielaag.
+- the manifest is validated and cached
+- `config/global.json` and `chains/global.json` are strict core dependencies
+- country-specific config and chain datasets are optional overlays
+- invalid or missing country overlays fall back to global data with warning logs
+- config inheritance through `extends` is supported by the loader
 
-De SDK wordt waar mogelijk gebruikt voor:
-- selectiecontext
-- venue ophalen en bijwerken
-- map- en editor-events
-- sidebar/tab integratie
-- settings/contextinformatie
+The manifest is not yet the full authoritative loader for config and chain file discovery. Core config and chain paths are still selected in code.
 
-### 6.2 WazeWrap als secundaire laag
+## Country resolution
 
-WazeWrap wordt alleen gebruikt:
-- waar het praktische helpers biedt
-- waar de SDK nog geen handige abstraction biedt
-- achter een adapterlaag zodat toekomstige vervanging eenvoudig blijft
+Country selection is runtime-driven. The script tries, in order:
 
-Directe business logic mag niet afhankelijk zijn van WazeWrap-specifieke objecten.
+1. the selected venue
+2. visible map context
+3. the previous runtime country
+4. the saved fallback country
 
-## 7. Configuratie-architectuur
+This affects which country overlay the userscript attempts to load before analyzing a venue or scanning visible venues.
 
-### 7.1 Configuratiehiërarchie
+## Analysis pipeline
 
-De configuratiehiërarchie is:
+When a venue is selected, the runtime:
 
-1. global
-2. community
-3. country
-4. state/region
-5. tijdelijke user override/fallback
+1. maps the SDK venue into the internal place-like model
+2. resolves the effective country
+3. reloads runtime config and chains if the country changed
+4. matches the venue against chain data
+5. resolves category standards and the effective policy
+6. evaluates the place and produces issues
+7. turns issues into proposals
+8. applies the local whitelist filter
+9. renders results in the feature editor and sidebar
 
-Voor v1 zijn global, community en country actief vereist. State/region wordt voorbereid maar nog niet volledig benut.
+Current rule inputs come from:
 
-### 7.2 Resolutie van actieve configuratie
+- `rules.cityInVenueName`
+- `formatting.phone`
+- `formatting.url`
+- category standards
+- chain policy
 
-De actieve configuratie wordt bepaald op basis van:
+Published exception datasets are not part of this pipeline yet.
 
-1. place country, indien beschikbaar
-2. editor/map-context
-3. laatst geldige runtime-country, zolang die context nog leidend is
-4. handmatige fallback-keuze bij onvoldoende zekerheid
+## UI surfaces
 
-Place-country wordt runtime-genormaliseerd vanuit de SDK op basis van zowel country-codevelden als country-id-velden op venue- en address-objecten.
+The current implementation has two main UI surfaces:
 
-Community-config kan meerdere landen dekken. Een country-config kan daarom verwijzen naar of erven van een communityprofiel.
+- a feature-editor block that shows venue analysis, issues, proposals, apply actions, and whitelist actions
+- a sidebar panel that shows runtime/debug state and scan controls
 
-### 7.3 Scheiding van datasets
+The runtime also supports scanning visible venues and rendering highlight output on the map.
 
-De data-repo bevat gescheiden datasets voor:
-- config
-- chains
-- exceptions
-- locales
-- schemas
-- manifest
+## Persistence
 
-Deze datasets worden afzonderlijk geladen, gevalideerd en samengevoegd in runtime.
+The script persists small amounts of client-side state:
 
-## 8. Merge-model
+- user settings in local storage
+- whitelist entries in local storage
+- cached manifest data through the cache manager
 
-Configuratiebestanden ondersteunen inheritance en voorspelbaar mergen.
+Whitelist entries are local to the browser profile and tied to a runtime snapshot of the active config and chain dataset versions.
 
-### 8.1 Basisregels
+## Logging and safety
 
-- primitives: child overschrijft parent
-- objects: deep merge
-- arrays: expliciete strategie per veld
+The runtime uses structured loader validation and logger output to make failures visible without silently masking core data problems.
 
-### 8.2 Array-strategieën
+Current safety behavior:
 
-Ondersteunde strategieën:
-- replace
-- appendUnique
-- keyedMerge
+- invalid manifests fail unless a valid cached manifest is available
+- invalid global config or global chains fail startup
+- invalid country overlays fall back to global data with explicit warnings
+- invalid whitelist storage resets to an empty whitelist store
 
-De merge-strategie wordt expliciet vastgelegd om onvoorspelbaar gedrag te voorkomen.
+## Active non-features
 
-## 9. Validatie
+The following items are intentionally not documented as active runtime features because they are not implemented in the current code:
 
-Validatie vindt plaats in twee fasen.
-
-### 9.1 Bestandvalidatie
-
-Elk extern JSON-bestand wordt individueel gevalideerd tegen het juiste schema:
-- manifest
-- config
-- chains
-- exceptions
-- locales
-
-### 9.2 Runtime-validatie
-
-Na merge en resolutie wordt de samengestelde runtime-config opnieuw gevalideerd tegen een runtime-schema.
-
-### 9.3 Fallback-gedrag
-
-Bij ongeldige of ontbrekende data:
-- logt het script duidelijke foutinformatie
-- gebruikt het script indien mogelijk last-known-good data
-- valt het script terug op parent of global config
-- crasht het script niet door corrupte data
-
-## 10. Matching engine
-
-De matching engine bepaalt of een place overeenkomt met een bekende chain of community-definitie.
-
-### 10.1 Matchbronnen
-
-Matching kan gebruikmaken van:
-- name
-- aliases
-- regex
-- partial word matching
-- prefix/infix/suffix patterns
-- category hints
-- brand hints
-- community- of country-scope
-
-### 10.2 Matchdoel
-
-Het doel van matching is:
-- herkennen van canonieke chain-identiteit
-- bepalen van relevante standaarden
-- voeden van harmonisatievoorstellen
-
-### 10.3 Ontwerpkeuze
-
-De matcher is config-driven. Alternatieve schrijfwijzen, synoniemen en uitzonderingen worden in data/config vastgelegd, niet hardcoded in scriptlogica.
-
-## 11. Rule engine
-
-### 11.1 Hoofdfunctie
-
-De rule engine evalueert de geselecteerde of gescande place tegen de actieve runtime-config.
-
-### 11.2 Rule-uitkomst
-
-Een rule mag nooit direct een wijziging committen.
-
-Een rule levert uitsluitend:
-- issue metadata
-- severity
-- message key
-- huidige waarde
-- voorgestelde waarde
-- rationale/context
-- whitelistbaarheid
-- apply eligibility
-
-### 11.3 Rulegroepen voor v1
-
-De eerste rulegroepen zijn:
-- name normalization
-- alias normalization
-- brand/chain harmonization
-- phone validation
-- URL validation
-- category validation
-- lock level recommendation
-- residential cleanup
-- beperkte EV- en parking-checks
-
-## 12. Proposal engine
-
-### 12.1 Doel
-
-De proposal engine vertaalt issues en rule-uitkomsten naar concrete, door de gebruiker selecteerbare wijzigingsvoorstellen.
-
-### 12.2 Output
-
-Per voorstel bevat het systeem:
-- field identifier
-- current value
-- proposed value
-- diff representation
-- source rule
-- source config scope
-- selectable state
-- apply constraints
-
-### 12.3 Manual apply only
-
-Alle voorstellen zijn handmatig.
-De gebruiker bepaalt via checkboxes welke wijzigingen mogen worden doorgevoerd.
-
-## 13. Apply layer
-
-### 13.1 Verantwoordelijkheid
-
-De apply layer vertaalt geselecteerde voorstellen naar gecontroleerde editor-updates.
-
-### 13.2 Veiligheidsmodel
-
-De apply layer:
-- accepteert alleen expliciet geselecteerde voorstellen
-- werkt per ondersteund veldtype
-- valideert invoer waar nodig opnieuw
-- rapporteert successen en fouten per wijziging
-- voert geen ongecontroleerde bulkmutaties uit
-
-### 13.3 v1-beperkingen
-
-In v1 ligt de focus op relatief beheersbare veldwijzigingen.
-Geometry-wijzigingen en complexere mutaties vallen buiten de eerste versie.
-
-## 14. UI-architectuur
-
-### 14.1 Hoofdonderdelen
-
-De UI bestaat uit een eigen sidebar met tabs:
-
-- Harmonization
-- Highlighter / Scan
-- Whitelist
-- Settings
-- Community Debug
-
-### 14.2 Harmonization-tab
-
-Toont:
-- gevonden issues
-- severity
-- chain match informatie
-- diff van huidige en voorgestelde waarden
-- checkboxes per voorstel
-- apply-knop
-
-### 14.3 Highlighter-tab
-
-Toont:
-- scanopties
-- legenda van highlight-kleuren
-- refresh/clear controls
-
-### 14.4 Whitelist-tab
-
-Toont:
-- lokale whitelist entries
-- import/export
-- merge/verwijderacties
-
-### 14.5 Settings-tab
-
-Toont:
-- locale instelling
-- stable/dev channel
-- cache refresh
-- debug toggle
-- fallback country override
-
-### 14.6 Community Debug-tab
-
-Toont:
-- geladen manifest
-- actieve config scope
-- validatiestatus
-- matchdetails
-- merge warnings
-- runtime info voor maintainers en developers
-
-## 15. Highlighter en scanmodel
-
-De kaartlaag kan places visueel markeren op basis van diagnose-uitkomsten.
-
-Voorgestelde statusgroepen:
-- groen: geen issues
-- oranje/geel: verbeteringen mogelijk
-- rood: ernstige issues
-- blauw: whitelisted
-- grijs: nog niet geanalyseerd of onvoldoende config
-
-Voor v1 geldt:
-- scan van zichtbare places is toegestaan
-- apply vindt alleen plaats na expliciete selectie en bevestiging op place-niveau
-
-## 16. Whitelist-architectuur
-
-Whitelisting is lokaal en editor-specifiek.
-
-### 16.1 Opslag
-
-Whitelist-data wordt opgeslagen in localStorage.
-
-### 16.2 Scope
-
-Whitelisting gebeurt op een voldoende specifiek niveau, bijvoorbeeld combinatie van:
-- place
-- rule
-- field
-
-### 16.3 Ondersteuning
-
-De whitelist ondersteunt:
-- versieerbare datastructuur
-- import/export
-- merge bij import
-- lokale inspectie en verwijdering
-
-## 17. Caching-architectuur
-
-### 17.1 Manifest-driven loading
-
-Het script laadt eerst een manifest dat beschrijft:
-- kanaal
-- versie
-- commit of build-identiteit
-- bekende bestanden
-- hashes of vergelijkbare validatiesignalen
-
-### 17.2 Cachebeleid
-
-Per bestand geldt:
-- gebruik cache indien geldig en actueel
-- fetch opnieuw indien manifest aangeeft dat data gewijzigd is
-- gebruik bij fouten last-known-good data
-- fallback naar parent/global waar zinvol
-
-### 17.3 Kanalen
-
-Minimaal ondersteunde kanalen:
-- stable
-- dev
-
-## 18. Internationalisatie
-
-Alle user-facing teksten lopen via translation keys.
-
-### 18.1 Talen voor v1
-
-Minimaal:
-- English
-- Dutch
-- German
-
-### 18.2 Fallback
-
-Bij ontbrekende keys wordt teruggevallen op Engels.
-
-### 18.3 Grenzen
-
-Configuratiebestanden mogen platte teksten bevatten voor community-data, maar UI-teksten en standaardmeldingen zijn i18n-driven.
-
-## 19. Logging en debug
-
-Het systeem bevat een logging- en debuglaag voor:
-- foutdiagnose
-- validatieproblemen
-- merge-conflicten
-- cacheproblemen
-- matchresultaten
-- apply-resultaten
-
-Debug-uitvoer moet bruikbaar zijn voor maintainers en developers, zonder normale editors te overladen.
-
-## 20. Toekomstige uitbreidingen
-
-Deze architectuur is bewust voorbereid op:
-- state/region runtime-ondersteuning
-- uitgebreidere country bundles
-- extra rulegroepen
-- complexere opening-hours ondersteuning
-- geavanceerdere apply workflows
-- uitgebreidere community governance via GitHub processen
-- mogelijk aanvullende tooling rondom config-validatie en preview
-
-## 21. Samenvatting
-
-WME Place Harmonizer ROW Edition is ontworpen als een modulaire, veilige en community-configurable oplossing voor harmonisatie van Places op de ROW server.
-
-De kern van de architectuur is:
-- één code-repo
-- één data-repo
-- config-first ontwerp
-- SDK-first integratie
-- manifest-gestuurde caching
-- rule- en proposal-gedreven workflow
-- handmatige toepassing van wijzigingen
-- robuuste validatie en fallback
+- shared exception datasets
+- manifest-driven dynamic loading of config and chain files
+- data-side merge strategy execution
+- whitelist import/export
+- state-level runtime config resolution as a first-class loading step

@@ -23,6 +23,7 @@ export interface PlaceLike {
   services?: string[];
 
   openingHours?: OpeningHourDefinition[];
+  navigationPointCount?: number;
   externalProviderIds?: string[];
   address?: PlaceAddress;
 

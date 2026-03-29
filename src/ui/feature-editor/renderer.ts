@@ -1,19 +1,11 @@
-import type { PlaceIssue } from "../../types/issue";
 import { ensureFeatureEditorContainer } from "./container";
+import type { PlaceIssue } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
-
-function findProposalForIssue(
-  issue: PlaceIssue,
-  proposals: PlaceProposal[]
-): PlaceProposal | undefined {
-
-  return proposals.find(
-    (proposal) =>
-      proposal.field === issue.field &&
-      proposal.issueRuleId === issue.ruleId
-  );
-
-}
+import {
+  groupIssuesForFeatureEditor,
+  type FeatureEditorIssueGroup
+} from "./issue-groups";
+import { t } from "../../i18n/runtime.ts";
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -29,107 +21,303 @@ function getSeverityIcon(severity: string): string {
 
 function getSeverityLabel(severity: string): string {
   if (severity === "error") {
-    return "Error";
+    return t("severity.error");
   }
 
   if (severity === "warning") {
-    return "Warning";
+    return t("severity.warning");
   }
 
-  return "Info";
+  return t("severity.info");
+}
+
+function getSeverityColors(severity: string): {
+  border: string;
+  background: string;
+  text: string;
+} {
+  if (severity === "error") {
+    return {
+      border: "#d32f2f",
+      background: "#fff5f5",
+      text: "#8b1e1e"
+    };
+  }
+
+  if (severity === "warning") {
+    return {
+      border: "#f9a825",
+      background: "#fff8e1",
+      text: "#8a5a00"
+    };
+  }
+
+  return {
+    border: "#1e88e5",
+    background: "#f1f8ff",
+    text: "#0b5394"
+  };
 }
 
 function escapeHtml(value: unknown): string {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function formatDisplayValue(value: unknown): string {
   const serialized = JSON.stringify(value);
-  return escapeHtml(serialized ?? "missing");
+  return escapeHtml(serialized ?? t("common.missing"));
 }
 
-function renderIssue(
-  issue: PlaceIssue,
-  proposals: PlaceProposal[]
+function formatProposalValue(
+  value: unknown,
+  displayValue?: string
 ): string {
-  const proposal = findProposalForIssue(issue, proposals);
+  if (typeof displayValue === "string" && displayValue.trim().length > 0) {
+    return escapeHtml(displayValue);
+  }
 
+  return formatDisplayValue(value);
+}
+
+function formatLinkedProposalValue(
+  value: unknown,
+  displayValue?: string,
+  valueUrl?: string
+): string {
+  const formattedValue = formatProposalValue(value, displayValue);
+
+  if (typeof valueUrl !== "string" || valueUrl.trim().length === 0) {
+    return formattedValue;
+  }
+
+  return `
+    <a
+      href="${escapeHtml(valueUrl)}"
+      target="_blank"
+      rel="noopener noreferrer"
+      style="color:#1a73e8;text-decoration:underline;"
+    >
+      ${formattedValue}
+    </a>
+  `;
+}
+
+function renderProposal(
+  issue: PlaceIssue,
+  proposal: PlaceProposal,
+  index: number
+): string {
   let html = "";
 
   html += `
     <div style="
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      padding: 8px;
-      margin-top: 8px;
-      background: #fff;
+      font-size:12px;
+      margin-top:6px;
+      ${index > 0 ? "padding-top:6px;border-top:1px solid #eee;" : ""}
     ">
   `;
 
-  html += `
-    <div style="font-weight:600; margin-bottom:4px;">
-      ${getSeverityIcon(issue.severity)} ${escapeHtml(issue.message)}
-    </div>
-  `;
-
-  if (issue.field) {
+  if (
+    proposal.currentValue !== undefined ||
+    (proposal.displayCurrentValue ?? "").trim().length > 0
+  ) {
     html += `
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">
-        Field: ${escapeHtml(issue.field)}
+      <div>
+        <b>${escapeHtml(t("featureEditor.current"))}:</b> ${formatProposalValue(
+          proposal.currentValue,
+          proposal.displayCurrentValue
+        )}
       </div>
     `;
   }
 
-  if (proposal) {
+  if (
+    proposal.proposedValue !== undefined ||
+    (proposal.displayProposedValue ?? "").trim().length > 0
+  ) {
     html += `
-      <div style="font-size:12px;margin-top:4px;">
-        <b>Current:</b> ${formatDisplayValue(proposal.currentValue)}
+      <div>
+        <b>${escapeHtml(t("featureEditor.suggested"))}:</b> ${formatLinkedProposalValue(
+          proposal.proposedValue,
+          proposal.displayProposedValue,
+          proposal.displayProposedValueUrl
+        )}
       </div>
     `;
+  }
+
+  if (proposal.reason && proposal.reason !== issue.message) {
+    html += `
+      <div style="color:#666;margin-top:4px;">
+        ${escapeHtml(proposal.reason)}
+      </div>
+    `;
+  }
+
+  if (proposal.isApplySupported) {
+    html += `
+      <label style="display:block;margin-top:6px;">
+        <input
+          type="checkbox"
+          class="wmeph-row-apply-checkbox"
+          data-proposal-id="${escapeHtml(proposal.id ?? "")}"
+        />
+        ${escapeHtml(t("featureEditor.applyThisFix"))}
+      </label>
+    `;
+  } else {
+    const manualText =
+      proposal.actionType === "manual-only"
+        ? t("featureEditor.manualActionRequired")
+        : t("featureEditor.suggestionNotApplicableYet");
 
     html += `
-      <div style="font-size:12px;">
-        <b>Suggested:</b> ${formatDisplayValue(proposal.proposedValue)}
+      <div style="color:#888;margin-top:6px;">
+        ${escapeHtml(manualText)}
       </div>
+    `;
+  }
+
+  html += `</div>`;
+
+  return html;
+}
+
+function isExternalProviderChoiceProposal(proposal: PlaceProposal): boolean {
+  return (
+    proposal.field === "externalProviderIds" &&
+    proposal.isApplySupported &&
+    typeof proposal.externalProviderTargetId === "string" &&
+    proposal.externalProviderTargetId.trim().length > 0
+  );
+}
+
+function shouldRenderAsSingleChoiceGroup(
+  group: FeatureEditorIssueGroup
+): boolean {
+  return (
+    group.field === "externalProviderIds" &&
+    group.proposals.filter((proposal) => isExternalProviderChoiceProposal(proposal))
+      .length > 1
+  );
+}
+
+function renderExternalProviderChoiceGroup(
+  issue: PlaceIssue,
+  group: FeatureEditorIssueGroup
+): string {
+  let html = "";
+  const currentValue = group.proposals[0];
+  const radioName = `wmeph-row-external-provider-${group.key}`;
+
+  if (
+    currentValue &&
+    (currentValue.currentValue !== undefined ||
+      (currentValue.displayCurrentValue ?? "").trim().length > 0)
+  ) {
+    html += `
+      <div style="font-size:12px;margin-top:6px;">
+        <b>${escapeHtml(t("featureEditor.current"))}:</b> ${formatProposalValue(
+          currentValue.currentValue,
+          currentValue.displayCurrentValue
+        )}
+      </div>
+    `;
+  }
+
+  for (let index = 0; index < group.proposals.length; index += 1) {
+    const proposal = group.proposals[index];
+    const suggestedValue = formatLinkedProposalValue(
+      proposal.proposedValue,
+      proposal.displayProposedValue,
+      proposal.displayProposedValueUrl
+    );
+
+    html += `
+      <label style="
+        display:block;
+        font-size:12px;
+        margin-top:${index === 0 ? 6 : 8}px;
+        ${index > 0 ? "padding-top:8px;border-top:1px solid #eee;" : ""}
+      ">
+        <input
+          type="radio"
+          name="${escapeHtml(radioName)}"
+          class="wmeph-row-apply-radio"
+          data-proposal-id="${escapeHtml(proposal.id ?? "")}"
+        />
+        <span style="margin-left:4px;">
+          <b>${escapeHtml(t("featureEditor.suggested"))}:</b> ${suggestedValue}
+        </span>
+      </label>
     `;
 
     if (proposal.reason && proposal.reason !== issue.message) {
       html += `
-        <div style="font-size:12px;color:#666;margin-top:4px;">
+        <div style="font-size:12px;color:#666;margin-top:4px;margin-left:20px;">
           ${escapeHtml(proposal.reason)}
         </div>
       `;
     }
+  }
 
-    if (proposal.isApplySupported) {
-      html += `
-        <label style="display:block;margin-top:6px;font-size:12px;">
-          <input
-            type="checkbox"
-            class="wmeph-row-apply-checkbox"
-            data-field="${escapeHtml(proposal.field)}"
-            data-rule-id="${escapeHtml(proposal.issueRuleId ?? "")}"
-          />
-          Apply this fix
-        </label>
-      `;
-    } else {
-      const manualText =
-        proposal.actionType === "manual-only"
-          ? "Manual action required"
-          : "This suggestion is not applyable yet";
+  return html;
+}
 
-      html += `
-        <div style="font-size:12px;color:#888;margin-top:6px;">
-          ${escapeHtml(manualText)}
-        </div>
-      `;
+function renderIssue(group: FeatureEditorIssueGroup): string {
+  let html = "";
+  const colors = getSeverityColors(group.severity);
+  const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
+
+  html += `
+    <div style="
+      border: 1px solid ${colors.border};
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      background: ${colors.background};
+    ">
+  `;
+
+  html += `
+    <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
+      ${getSeverityIcon(group.severity)} ${escapeHtml(getSeverityLabel(group.severity))}: ${escapeHtml(group.message)}
+    </div>
+  `;
+
+  if (group.field) {
+    html += `
+      <div style="font-size:12px;color:#666;margin-bottom:4px;">
+        ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(group.field)}
+      </div>
+    `;
+  }
+
+  if (shouldRenderAsSingleChoiceGroup(group)) {
+    html += renderExternalProviderChoiceGroup(group.issues[0], group);
+  } else {
+    for (let index = 0; index < group.proposals.length; index += 1) {
+      html += renderProposal(group.issues[0], group.proposals[index], index);
     }
+  }
+
+  if (canWhitelist) {
+    html += `
+      <div style="margin-top:8px;">
+        <button
+          type="button"
+          class="wmeph-row-whitelist-issue"
+          data-group-key="${escapeHtml(group.key)}"
+        >
+          ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
+        </button>
+      </div>
+    `;
   }
 
   html += `</div>`;
@@ -151,6 +339,7 @@ export function renderFeatureEditorAnalysis(
   }
 
   let html = "";
+  const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
 
   html += `
   <div style="
@@ -160,7 +349,7 @@ export function renderFeatureEditorAnalysis(
   ">
 
   <div style=" font-weight:600; margin-bottom:8px;">
-    Place Harmonizer
+    ${escapeHtml(t("featureEditor.title"))}
   </div>
 
   <div style="
@@ -197,26 +386,26 @@ export function renderFeatureEditorAnalysis(
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Place</b></div>
+      <div><b>${escapeHtml(t("featureEditor.place"))}</b></div>
       <div>${escapeHtml(placeName)}</div>
     </div>
   `;
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Chain</b></div>
-      <div>${escapeHtml(chainId ?? "None")}</div>
+      <div><b>${escapeHtml(t("featureEditor.chain"))}</b></div>
+      <div>${escapeHtml(chainId ?? t("common.none"))}</div>
     </div>
   `;
 
   html += `
     <div style="margin-bottom:8px;">
-      <div><b>Issues</b></div>
-      <div>${issues.length}</div>
+      <div><b>${escapeHtml(t("featureEditor.findings"))}</b></div>
+      <div>${issueGroups.length}</div>
     </div>
   `;
 
-  if (issues.length === 0) {
+  if (issueGroups.length === 0) {
     html += `
       <div style="
         border: 1px solid #ddd;
@@ -225,12 +414,12 @@ export function renderFeatureEditorAnalysis(
         background: #fff;
         color: green;
       ">
-        No issues found
+        ${escapeHtml(t("featureEditor.noFindings"))}
       </div>
     `;
   } else {
-    for (const issue of issues) {
-      html += renderIssue(issue, proposals);
+    for (const group of issueGroups) {
+      html += renderIssue(group);
     }
   }
 
@@ -240,7 +429,7 @@ export function renderFeatureEditorAnalysis(
     html += `
       <div style="margin-top:12px;">
         <button id="wmeph-row-apply-selected" type="button">
-          Apply selected fixes
+          ${escapeHtml(t("featureEditor.applySelectedFixes"))}
         </button>
       </div>
     `;

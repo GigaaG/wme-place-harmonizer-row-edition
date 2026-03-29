@@ -1,9 +1,9 @@
 import { logger } from "../logging/logger";
 import { getWmeSdk } from "../integration/sdk/wme";
 import type { VisibleVenueScanSummary, ScannedVenueResult } from "../types/scan";
+import { t } from "../i18n/runtime.ts";
 
 const HIGHLIGHT_LAYER_NAME = "wmeph-row-visible-venues";
-const HIGHLIGHT_CHECKBOX_NAME = "Place Harmonizer scan highlights";
 const MIN_POINT_HIGHLIGHT_ZOOM = 17;
 const POINT_HIGHLIGHT_RADIUS = 12;
 const POINT_HIGHLIGHT_STROKE = 5;
@@ -346,7 +346,7 @@ export function ensureHighlightLayer(): void {
 
   if (!checkboxInitialized) {
     sdk.LayerSwitcher.addLayerCheckbox({
-      name: HIGHLIGHT_CHECKBOX_NAME,
+      name: t("highlighter.layerCheckboxName"),
       isChecked: true
     });
 

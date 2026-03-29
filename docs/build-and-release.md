@@ -6,14 +6,10 @@ This document describes the current local build and release workflow for the use
 
 The repository is a TypeScript project built with Vite.
 
-Current build outputs:
-
 ```text
 dist/wme-place-harmonizer-row-edition.user.js
 dist/wme-place-harmonizer-row-edition.dev.user.js
 ```
-
-These are the userscript files installed in Tampermonkey.
 
 ## Available npm scripts
 
@@ -22,12 +18,12 @@ npm run dev
 npm run build
 npm run build:dev
 npm run build:prod
+npm run lint
+npm run check
 npm run test
 npm run release:dev
 npm run release:stable
 ```
-
-`npm run lint` is defined in `package.json`, but the repository still does not contain an `eslint.config.*` file. Treat linting as unavailable until that configuration is added.
 
 ## Build modes
 
@@ -57,13 +53,13 @@ Switching the runtime channel changes the manifest within the active branch. It 
 2. Build a development userscript with `npm run build:dev` or `npm run dev`.
 3. Load the generated userscript into Tampermonkey.
 4. Test in WME.
-5. Run `npm run test`.
+5. Run `npm run check`.
 6. Build a production userscript only when you want a release candidate.
 
 ## Manual release checklist
 
 1. Ensure the working tree is in the intended release state.
-2. Run `npm run test`.
+2. Run `npm run check`.
 3. Run `npm run build:prod`.
 4. Install and test the production userscript in WME.
 5. Create the release commit and tag.
@@ -72,5 +68,4 @@ Switching the runtime channel changes the manifest within the active branch. It 
 ## Current repository gaps
 
 - There is no active code-side CI workflow in the repository at the moment.
-- Linting is not wired up yet because the ESLint configuration file is missing.
 - Runtime verification in WME is still an important release gate.

@@ -10,14 +10,17 @@
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src tests vite.config.ts",
+    "check": "npm run lint && npm run test",
     "test": "node --experimental-strip-types --experimental-specifier-resolution=node tests/run-tests.ts",
     "release:dev": "npm run build:dev",
     "release:stable": "npm run build:prod"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@types/node": "^24.0.0",
-    "eslint": "^9.0.0",
+    "eslint": "^10.0.0",
     "typescript": "^5.0.0",
     "vite": "^7.0.0"
   }

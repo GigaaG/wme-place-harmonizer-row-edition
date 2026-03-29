@@ -4,11 +4,7 @@ WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Edito
 
 ## For Users
 
-### What the script is
-
 This script adds harmonization checks to WME for the ROW environment. It is designed to support place maintenance without making automatic edits on the editor's behalf.
-
-### What it does
 
 In the current implementation, the script:
 
@@ -24,11 +20,9 @@ The script is data-driven. It reads manifests, config, chains, locales, and refe
 
 The data repository also publishes exception datasets, but the current userscript runtime does not consume them yet.
 
-### Who it is for
-
 This script is intended for Waze editors and maintainers who want help reviewing place data against shared standards before making manual edits.
 
-### Main features
+## Main Features
 
 - venue analysis for the current selection
 - chain matching
@@ -37,7 +31,7 @@ This script is intended for Waze editors and maintainers who want help reviewing
 - visible-venue scan and highlight output
 - local whitelist support for suppressing specific issues
 
-### Installation and usage
+## Installation and Usage
 
 You need:
 
@@ -64,7 +58,7 @@ Use the script:
 
 The script also supports scanning visible venues and highlighting them by severity.
 
-### Important limitations and notes
+## Notes
 
 - The script does not make automatic edits.
 - Only supported proposal types can be applied from the UI.
@@ -72,25 +66,11 @@ The script also supports scanning visible venues and highlighting them by severi
 - Country-specific config and chain overlays are optional; when they fail to load, the runtime falls back to global data and logs the reason.
 - The UI locale follows the WME SDK locale first, then the data-side default locale, then English.
 
-### Stable and development channels
+## Stable and Development Channels
 
-Production builds read data from the data repository `main` branch and default to `manifest/stable.json`.
-Development builds read data from the data repository `dev` branch and default to `manifest/dev.json`.
-Changing the runtime data channel switches between the stable and dev manifests inside the active branch. It does not switch branches at runtime.
+Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
 
 ## For Developers
-
-### Repository structure
-
-```text
-src/        TypeScript source code
-tests/      Source-level automated tests
-docs/       Maintained implementation and workflow docs
-dist/       Generated userscript output
-scripts/    Build support scripts
-```
-
-### Local setup
 
 Prerequisites:
 
@@ -111,19 +91,17 @@ Common commands:
 npm run dev
 npm run build:dev
 npm run build:prod
+npm run lint
+npm run check
 npm run test
 ```
 
-The repository also defines `npm run lint`, but the current checkout still does not include an `eslint.config.*` file. Treat linting as a known setup gap until that configuration is added.
-
-### Build outputs
+Build outputs:
 
 - `npm run build:dev` writes `dist/wme-place-harmonizer-row-edition.dev.user.js`
 - `npm run build:prod` writes `dist/wme-place-harmonizer-row-edition.user.js`
 
 Development builds use `WMEPH-ROW:dev:*` storage keys. Production builds use `WMEPH-ROW:*`.
-
-### Relationship with the data repository
 
 This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 
@@ -131,27 +109,15 @@ This repository is the code side of a two-repository system. Runtime behavior de
 
 When behavior, contracts, or user-facing text change here, check whether the data repository also needs updates. That commonly includes locale files, locale templates, manifests, config, chains, and locale-keyed `editorNotes`.
 
-The current runtime actively consumes:
-
-- `config/global.json` and optional country config overlays
-- `chains/global.json` and optional country chain overlays
-- manifest metadata and locale file availability
-- locale files
-- the SDK values snapshot during local build and test workflows
-
-Published exception datasets and data-side merge strategies are not active runtime features in the current userscript implementation.
-
-### Contributing and verification
-
 Recommended local workflow:
 
 1. Install dependencies with `npm install`.
 2. Build a development userscript with `npm run build:dev` or `npm run dev`.
 3. Load the generated userscript into Tampermonkey.
 4. Test the script in WME.
-5. Run `npm run test` before opening a pull request.
+5. Run `npm run check` before opening a pull request.
 
-### Further documentation
+Further documentation:
 
 - [docs/architecture.md](docs/architecture.md)
 - [docs/build-and-release.md](docs/build-and-release.md)

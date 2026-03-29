@@ -20,17 +20,31 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      DATA_REPO_REF: ${{ github.ref_name == 'main' && 'main' || github.base_ref == 'main' && 'main' || 'dev' }}
+    defaults:
+      run:
+        working-directory: wme-place-harmonizer-row-edition
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          path: wme-place-harmonizer-row-edition
+
+      - name: Check out companion data repository
+        uses: actions/checkout@v5
+        with:
+          repository: GigaaG/wme-place-harmonizer-row-data
+          ref: ${{ env.DATA_REPO_REF }}
+          path: wme-place-harmonizer-row-data
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22.x
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: wme-place-harmonizer-row-edition/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -66,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: userscript-builds
-          path: artifacts/**
+          path: wme-place-harmonizer-row-edition/artifacts/**
           if-no-files-found: error
           retention-days: 14
 

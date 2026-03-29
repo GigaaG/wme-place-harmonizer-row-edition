@@ -108,7 +108,7 @@ Build outputs:
 
 Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
 
-Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. On pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch. Stable builds remain the Greasy Fork release path.
+Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. On pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch. On pushes to `main`, CI republishes `dist/wme-place-harmonizer-row-edition.user.js` back to `main` so Greasy Fork can sync from a fixed stable artifact URL.
 
 This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 
@@ -125,12 +125,13 @@ Recommended local workflow:
 5. Run `npm run check` before opening a pull request.
 6. Bump `package.json` to the version you plan to release before starting a beta cycle.
 7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and republish the beta userscript that Tampermonkey tracks. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
-8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish the stable artifact to Greasy Fork.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish or sync the stable artifact through Greasy Fork.
 
 Further documentation:
 
 - [docs/architecture.md](docs/architecture.md)
 - [docs/build-and-release.md](docs/build-and-release.md)
+- [docs/release-checklist.md](docs/release-checklist.md)
 - [docs/whitelist-model.md](docs/whitelist-model.md)
 
 ## License

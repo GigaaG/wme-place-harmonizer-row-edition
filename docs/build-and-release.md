@@ -27,7 +27,7 @@ npm run test
 
 ## Continuous Integration
 
-A GitHub Actions workflow runs `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod` on pushes and pull requests, then uploads the generated userscript artifacts. On pushes to `beta`, the workflow also republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL.
+A GitHub Actions workflow runs `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod` on pushes and pull requests, then uploads the generated userscript artifacts. On pushes to `beta`, the workflow republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, the workflow republishes `dist/wme-place-harmonizer-row-edition.user.js` back to the `main` branch so Greasy Fork can sync from a fixed stable artifact URL.
 
 ## Build modes
 
@@ -68,16 +68,10 @@ Switching the runtime channel changes the manifest within the active branch. It 
 5. Run `npm run check`.
 6. Bump `package.json` to the version you intend to release before you start a beta cycle.
 7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and republish the beta artifact that testers track. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
-8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish the stable artifact to Greasy Fork.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish or sync the stable artifact through Greasy Fork.
 
-## Manual release checklist
+## Release checklist
 
-1. Ensure the working tree is in the intended release state.
-2. Run `npm run check`.
-3. Bump `package.json` to the intended release version if you have not done so already.
-4. For beta, merge `dev` into `beta` and confirm the CI workflow republishes the beta artifact with beta metadata.
-5. Open WME with a logged-in account and the beta userscript installed.
-6. Verify the userscript initializes, loads the expected data, and renders the key UI surfaces without runtime errors.
-7. If beta testing passes, merge `beta` into `main`.
-8. Run `npm run build:dev` and `npm run build:prod`.
-9. Publish the generated `.user.js` artifact through Greasy Fork.
+Use the dedicated release checklist when promoting `beta` to `main` and publishing or syncing the stable release through Greasy Fork:
+
+- [docs/release-checklist.md](release-checklist.md)

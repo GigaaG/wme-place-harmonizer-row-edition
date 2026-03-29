@@ -108,7 +108,7 @@ Build outputs:
 
 Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
 
-Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. On pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch. On pushes to `main`, CI republishes `dist/wme-place-harmonizer-row-edition.user.js` back to `main` so Greasy Fork can sync from a fixed stable artifact URL. CI also removes the other channel artifacts from those branches so `beta` keeps only the beta script and `main` keeps only the stable script.
+Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. Pull requests are verified before merge. After merge, pushes to `beta` republish `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch, and pushes to `main` republish `dist/wme-place-harmonizer-row-edition.user.js` back to `main` so Greasy Fork can sync from a fixed stable artifact URL. CI also removes the other channel artifacts from those branches so `beta` keeps only the beta script and `main` keeps only the stable script.
 
 This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 

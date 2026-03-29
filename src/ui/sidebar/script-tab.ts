@@ -1,5 +1,5 @@
-import { logger } from "../../logging/logger";
-import { getWmeSdk } from "../../integration/sdk/wme";
+import { logger } from "../../logging/logger.ts";
+import { getWmeSdk } from "../../integration/sdk/wme.ts";
 import { t } from "../../i18n/runtime.ts";
 
 const SCRIPT_TAB_ID = "wmeph-row-script-tab";

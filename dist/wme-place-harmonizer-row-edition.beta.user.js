@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME Place Harmonizer ROW Edition (Beta)
 // @namespace    https://github.com/
-// @version      0.1.1-beta.8
+// @version      0.1.1-beta.11
 // @description  TypeScript userscript for Waze Map Editor ROW Edition place harmonization
 // @author       Contributors
 // @include      https://www.waze.com/editor*
@@ -3891,6 +3891,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "beta";
     const googleValidationChecks = state.googleMapsValidation?.checks;
     const googleValidationAvailability = state.googleMapsValidationAvailability;
     const googleValidationAvailable = googleValidationAvailability?.enabled ?? true;
+    const showGoogleValidationChecks = googleValidationAvailable && googleValidationEnabled;
     html += `
     <div style="margin-bottom:8px;">
       <b>${escapeHtml(t("sidebar.googleMapsValidation"))}</b><br>
@@ -3903,26 +3904,29 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "beta";
         />
         ${escapeHtml(t("sidebar.googleMapsValidation.enabled"))}
       </label>
+  `;
+    if (showGoogleValidationChecks) {
+      html += `
       <div style="font-size:12px;color:#666;margin:6px 0 4px 18px;">
         ${escapeHtml(t("sidebar.googleMapsValidation.checks"))}
       </div>
-  `;
-    for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
-      const isChecked = googleValidationChecks?.[checkKey] ?? true;
-      const isAvailable = googleValidationAvailability?.checks?.[checkKey] ?? true;
-      const isDisabled = !googleValidationAvailable || !googleValidationEnabled || !isAvailable;
-      const textColor = !googleValidationAvailable || !isAvailable || !googleValidationEnabled ? "#888" : "#222";
-      html += `
-      <label style="font-size:12px;display:block;margin-left:18px;color:${textColor};">
-        <input
-          id="wmeph-row-google-validation-${escapeHtml(checkKey)}"
-          type="checkbox"
-          ${isChecked ? "checked" : ""}
-          ${isDisabled ? "disabled" : ""}
-        />
-        ${escapeHtml(t(`sidebar.googleMapsValidation.${checkKey}`))}
-      </label>
     `;
+      for (const checkKey of GOOGLE_MAPS_VALIDATION_CHECK_KEYS) {
+        const isChecked = googleValidationChecks?.[checkKey] ?? true;
+        const isAvailable = googleValidationAvailability?.checks?.[checkKey] ?? true;
+        const textColor = !isAvailable ? "#888" : "#222";
+        html += `
+        <label style="font-size:12px;display:block;margin-left:18px;color:${textColor};">
+          <input
+            id="wmeph-row-google-validation-${escapeHtml(checkKey)}"
+            type="checkbox"
+            ${isChecked ? "checked" : ""}
+            ${isAvailable ? "" : "disabled"}
+          />
+          ${escapeHtml(t(`sidebar.googleMapsValidation.${checkKey}`))}
+        </label>
+      `;
+      }
     }
     html += `
     </div>

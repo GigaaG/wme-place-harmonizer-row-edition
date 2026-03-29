@@ -1,5 +1,6 @@
 import type { PlaceIssue } from "../types/issue";
 import type { PlaceProposal } from "../types/proposal";
+import { APP_STORAGE_PREFIX } from "../constants/app.ts";
 import type {
   WhitelistEntry,
   WhitelistFilterResult,
@@ -10,9 +11,7 @@ import type {
 const WHITELIST_STORE_VERSION = 1;
 
 function getWhitelistStorageKey(): string {
-  return import.meta.env?.MODE === "development"
-    ? "WMEPH-ROW:dev:whitelist"
-    : "WMEPH-ROW:whitelist";
+  return `${APP_STORAGE_PREFIX}:whitelist`;
 }
 
 function getDefaultStore(): WhitelistStore {

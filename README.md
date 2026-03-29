@@ -43,6 +43,7 @@ Install the script:
 
 1. Obtain a built userscript file.
    - `dist/wme-place-harmonizer-row-edition.user.js` for the production build
+   - `dist/wme-place-harmonizer-row-edition.beta.user.js` for the beta build
    - `dist/wme-place-harmonizer-row-edition.dev.user.js` for the development build
 2. Open the file in Tampermonkey.
 3. Install or update the script.
@@ -66,9 +67,9 @@ The script also supports scanning visible venues and highlighting them by severi
 - Country-specific config and chain overlays are optional; when they fail to load, the runtime falls back to global data and logs the reason.
 - The UI locale follows the WME SDK locale first, then the data-side default locale, then English.
 
-## Stable and Development Channels
+## Stable, Beta, and Development Channels
 
-Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
+Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Beta and development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
 
 ## For Developers
 
@@ -90,6 +91,7 @@ Common commands:
 ```bash
 npm run dev
 npm run build:dev
+npm run build:beta
 npm run build:prod
 npm run lint
 npm run check
@@ -99,9 +101,14 @@ npm run test
 Build outputs:
 
 - `npm run build:dev` writes `dist/wme-place-harmonizer-row-edition.dev.user.js`
+- `npm run build:beta` writes `dist/wme-place-harmonizer-row-edition.beta.user.js`
 - `npm run build:prod` writes `dist/wme-place-harmonizer-row-edition.user.js`
 
-Development builds use `WMEPH-ROW:dev:*` storage keys. Production builds use `WMEPH-ROW:*`.
+`npm run build:beta` and `npm run build:prod` stamp beta and stable artifacts from the current development build output, so run `npm run build:dev` first.
+
+Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
+
+Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the beta branch artifact. On pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch. Stable builds remain the Greasy Fork release path.
 
 This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 
@@ -116,6 +123,9 @@ Recommended local workflow:
 3. Load the generated userscript into Tampermonkey.
 4. Test the script in WME.
 5. Run `npm run check` before opening a pull request.
+6. Bump `package.json` to the version you plan to release before starting a beta cycle.
+7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and republish the beta userscript that Tampermonkey tracks. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish the stable artifact to Greasy Fork.
 
 Further documentation:
 

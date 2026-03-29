@@ -8,6 +8,7 @@ The repository is a TypeScript project built with Vite.
 
 ```text
 dist/wme-place-harmonizer-row-edition.user.js
+dist/wme-place-harmonizer-row-edition.beta.user.js
 dist/wme-place-harmonizer-row-edition.dev.user.js
 ```
 
@@ -17,32 +18,43 @@ dist/wme-place-harmonizer-row-edition.dev.user.js
 npm run dev
 npm run build
 npm run build:dev
+npm run build:beta
 npm run build:prod
 npm run lint
 npm run check
 npm run test
-npm run release:dev
-npm run release:stable
 ```
+
+## Continuous Integration
+
+A GitHub Actions workflow runs `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod` on pushes and pull requests, then uploads the generated userscript artifacts. On pushes to `beta`, the workflow also republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL.
 
 ## Build modes
 
-The repository supports two build modes:
+The repository supports three build modes:
 
 - development
+- beta
 - production
 
 Production builds write `dist/wme-place-harmonizer-row-edition.user.js`.
+Beta builds write `dist/wme-place-harmonizer-row-edition.beta.user.js`.
 Development builds write `dist/wme-place-harmonizer-row-edition.dev.user.js`.
 
 Development builds use `WMEPH-ROW:dev:*` local storage keys.
+Beta builds use `WMEPH-ROW:beta:*` local storage keys.
 Production builds use `WMEPH-ROW:*`.
+
+Beta builds generate beta-specific userscript metadata, including a beta name suffix, a beta version suffix, and `@downloadURL` / `@updateURL` entries that point at the beta branch artifact on GitHub. Production builds stay clean for the Greasy Fork release path.
+
+`npm run build:beta` and `npm run build:prod` stamp beta and stable artifacts from the current development build output, so run `npm run build:dev` first. Beta versions use the current `package.json` version plus a `-beta.<build>` suffix. Production versions use the plain `package.json` version.
 
 ## Data channel behavior
 
 Build type also determines the default data source:
 
 - production builds read from the data repository `main` branch and default to `manifest/stable.json`
+- beta builds read from the data repository `dev` branch and default to `manifest/dev.json`
 - development builds read from the data repository `dev` branch and default to `manifest/dev.json`
 
 Switching the runtime channel changes the manifest within the active branch. It does not switch branches at runtime.
@@ -54,18 +66,18 @@ Switching the runtime channel changes the manifest within the active branch. It 
 3. Load the generated userscript into Tampermonkey.
 4. Test in WME.
 5. Run `npm run check`.
-6. Build a production userscript only when you want a release candidate.
+6. Bump `package.json` to the version you intend to release before you start a beta cycle.
+7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and republish the beta artifact that testers track. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish the stable artifact to Greasy Fork.
 
 ## Manual release checklist
 
 1. Ensure the working tree is in the intended release state.
 2. Run `npm run check`.
-3. Run `npm run build:prod`.
-4. Install and test the production userscript in WME.
-5. Create the release commit and tag.
-6. Publish the generated `.user.js` artifact through the chosen release channel.
-
-## Current repository gaps
-
-- There is no active code-side CI workflow in the repository at the moment.
-- Runtime verification in WME is still an important release gate.
+3. Bump `package.json` to the intended release version if you have not done so already.
+4. For beta, merge `dev` into `beta` and confirm the CI workflow republishes the beta artifact with beta metadata.
+5. Open WME with a logged-in account and the beta userscript installed.
+6. Verify the userscript initializes, loads the expected data, and renders the key UI surfaces without runtime errors.
+7. If beta testing passes, merge `beta` into `main`.
+8. Run `npm run build:dev` and `npm run build:prod`.
+9. Publish the generated `.user.js` artifact through Greasy Fork.

@@ -1,9 +1,9 @@
-import { IS_DEV_SCRIPT_BUILD } from "./build.ts";
+import { IS_DEV_SCRIPT_BUILD, SCRIPT_BUILD_CHANNEL } from "./build.ts";
 
 export const APP_NAME = "WME Place Harmonizer ROW Edition";
 export const APP_SHORT_NAME = "WMEPH-ROW";
 export const APP_STORAGE_PREFIX = IS_DEV_SCRIPT_BUILD
-  ? `${APP_SHORT_NAME}:dev`
+  ? `${APP_SHORT_NAME}:${SCRIPT_BUILD_CHANNEL}`
   : APP_SHORT_NAME;
 
 export const SUPPORTED_DATA_CHANNELS = ["stable", "dev"] as const;

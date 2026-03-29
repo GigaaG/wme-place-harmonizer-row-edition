@@ -6,15 +6,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch --mode development",
-    "build": "vite build --mode production",
-    "build:dev": "vite build --mode development",
-    "build:prod": "vite build --mode production",
-    "lint": "eslint src tests vite.config.ts",
+    "dev": "node scripts/build-userscript.mjs dev --watch",
+    "build": "npm run build:dev && npm run build:prod",
+    "build:dev": "node scripts/build-userscript.mjs dev",
+    "build:beta": "node scripts/build-userscript.mjs beta",
+    "build:prod": "node scripts/build-userscript.mjs stable",
+    "lint": "eslint src tests scripts/build-userscript.mjs",
     "check": "npm run lint && npm run test",
-    "test": "node --experimental-strip-types --experimental-specifier-resolution=node tests/run-tests.ts",
-    "release:dev": "npm run build:dev",
-    "release:stable": "npm run build:prod"
+    "test": "node --experimental-strip-types --experimental-specifier-resolution=node tests/run-tests.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",

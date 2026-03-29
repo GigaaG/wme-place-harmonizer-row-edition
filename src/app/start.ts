@@ -1,5 +1,5 @@
 import { APP_NAME } from "../constants/app";
-import { BUILD_MODE, IS_DEV_SCRIPT_BUILD } from "../constants/build";
+import { SCRIPT_BUILD_CHANNEL } from "../constants/build";
 import { logger } from "../logging/logger";
 import { settingsManager } from "../settings/manager";
 import {
@@ -1398,7 +1398,7 @@ export async function startApplication(): Promise<void> {
   runtimeSettings = settings;
   logger.info(`Loaded settings for channel: ${settings.dataChannel}`);
   logger.info(
-    `Runtime source: buildMode=${BUILD_MODE}, scriptBuild=${IS_DEV_SCRIPT_BUILD ? "dev" : "prod"}, dataBranch=${DATA_REPOSITORY_BRANCH}, dataChannel=${settings.dataChannel}`
+    `Runtime source: scriptBuild=${SCRIPT_BUILD_CHANNEL}, dataBranch=${DATA_REPOSITORY_BRANCH}, dataChannel=${settings.dataChannel}`
   );
 
   try {

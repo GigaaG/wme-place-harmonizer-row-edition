@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         WME Place Harmonizer ROW Edition (Beta)
+// @name         WME Place Harmonizer ROW Edition
 // @namespace    https://github.com/
 // @version      0.1.1-beta.22
 // @description  TypeScript userscript for Waze Map Editor ROW Edition place harmonization
@@ -10,15 +10,13 @@
 // @include      https://beta.waze.com/*/editor*
 // @exclude      https://www.waze.com/user*
 // @exclude      https://www.waze.com/*/user*
-// @downloadURL  https://raw.githubusercontent.com/GigaaG/wme-place-harmonizer-row-edition/beta/dist/wme-place-harmonizer-row-edition.beta.user.js
-// @updateURL    https://raw.githubusercontent.com/GigaaG/wme-place-harmonizer-row-edition/beta/dist/wme-place-harmonizer-row-edition.beta.user.js
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @run-at       document-end
 // ==/UserScript==
 
-globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "beta";
+globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
 (function() {
   "use strict";
   class Logger {

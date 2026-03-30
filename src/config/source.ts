@@ -1,9 +1,10 @@
 import type { DataChannel } from "../constants/app.ts";
-import { IS_DEV_SCRIPT_BUILD } from "../constants/build.ts";
+import { SCRIPT_BUILD_CHANNEL } from "../constants/build.ts";
 
 export const DATA_REPOSITORY_OWNER = "GigaaG";
 export const DATA_REPOSITORY_NAME = "wme-place-harmonizer-row-data";
-export const DATA_REPOSITORY_BRANCH = IS_DEV_SCRIPT_BUILD ? "dev" : "main";
+export const DATA_REPOSITORY_BRANCH =
+  SCRIPT_BUILD_CHANNEL === "stable" ? "main" : SCRIPT_BUILD_CHANNEL;
 
 export function appendQueryParam(
   url: string,

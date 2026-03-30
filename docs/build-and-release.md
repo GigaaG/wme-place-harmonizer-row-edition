@@ -54,7 +54,7 @@ Beta builds generate beta-specific userscript metadata, including a beta name su
 Build type also determines the default data source:
 
 - production builds read from the data repository `main` branch and default to `manifest/stable.json`
-- beta builds read from the data repository `dev` branch and default to `manifest/dev.json`
+- beta builds read from the data repository `beta` branch and default to `manifest/dev.json`
 - development builds read from the data repository `dev` branch and default to `manifest/dev.json`
 
 Switching the runtime channel changes the manifest within the active branch. It does not switch branches at runtime.

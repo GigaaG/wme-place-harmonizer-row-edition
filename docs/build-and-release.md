@@ -27,7 +27,7 @@ npm run test
 
 ## Continuous Integration
 
-A GitHub Actions workflow verifies pull requests and branch pushes by running `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod`, then uploads the generated userscript artifacts. Publication is a separate post-merge step: on pushes to `beta`, CI republishes `dist/wme-place-harmonizer-row-edition.beta.user.js` back to the `beta` branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, CI republishes `dist/wme-place-harmonizer-row-edition.user.js` back to the `main` branch so Greasy Fork can sync from a fixed stable artifact URL. Each branch publication step also removes the other channel artifacts from `dist`, so `beta` only keeps the beta script and `main` only keeps the stable script.
+A GitHub Actions workflow verifies pull requests and branch pushes by running `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod`, then uploads the generated userscript artifacts. Publication is a separate post-merge step: on pushes to `beta`, CI republishes the verified beta userscript to the `beta-dist` artifact branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, CI republishes the verified stable userscript to the `stable-dist` artifact branch so Greasy Fork can sync from a fixed stable artifact URL. Source branches stay free of committed generated userscript files, which avoids repeated merge conflicts during `dev -> beta -> main` promotion.
 
 ## Build modes
 
@@ -45,7 +45,7 @@ Development builds use `WMEPH-ROW:dev:*` local storage keys.
 Beta builds use `WMEPH-ROW:beta:*` local storage keys.
 Production builds use `WMEPH-ROW:*`.
 
-Beta builds generate beta-specific userscript metadata, including a beta name suffix, a beta version suffix, and `@downloadURL` / `@updateURL` entries that point at the beta branch artifact on GitHub. Production builds stay clean for the Greasy Fork release path.
+Beta builds generate beta-specific userscript metadata, including a beta name suffix, a beta version suffix, and `@downloadURL` / `@updateURL` entries that point at the `beta-dist` artifact branch on GitHub. Production builds stay clean for the Greasy Fork release path.
 
 `npm run build:beta` and `npm run build:prod` stamp beta and stable artifacts from the current development build output, so run `npm run build:dev` first. Beta versions use the current `package.json` version plus a `-beta.<build>` suffix. Production versions use the plain `package.json` version.
 
@@ -67,11 +67,11 @@ Switching the runtime channel changes the manifest within the active branch. It 
 4. Test in WME.
 5. Run `npm run check`.
 6. Bump `package.json` to the version you intend to release before you start a beta cycle.
-7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and republish the beta artifact that testers track. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
-8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and publish or sync the stable artifact through Greasy Fork.
+7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and republish the beta artifact that testers track to `beta-dist`. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
+8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and let Greasy Fork sync the stable artifact from `stable-dist`.
 
 ## Release checklist
 
-Use the dedicated release checklist when promoting `beta` to `main` and publishing or syncing the stable release through Greasy Fork:
+Use the dedicated release checklist when promoting `beta` to `main` and syncing the stable release through Greasy Fork:
 
 - [docs/release-checklist.md](release-checklist.md)

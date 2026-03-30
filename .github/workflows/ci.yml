@@ -88,6 +88,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
     needs: verify
     runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: beta-dist
+      PUBLISHED_FILE: dist/wme-place-harmonizer-row-edition.user.js
+      SOURCE_FILE: ${{ runner.temp }}/userscript-builds/beta/wme-place-harmonizer-row-edition.beta.user.js
     defaults:
       run:
         working-directory: wme-place-harmonizer-row-edition
@@ -102,29 +106,38 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: wme-place-harmonizer-row-edition/artifact-download
+          path: ${{ runner.temp }}/userscript-builds
 
-      - name: Publish beta artifact to beta branch
+      - name: Publish beta artifact to artifact branch
         run: |
-          mkdir -p dist
-          cp artifact-download/beta/wme-place-harmonizer-row-edition.beta.user.js dist/
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.beta.user.js
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH"; then
+            git fetch origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            git checkout --orphan "$TARGET_BRANCH"
+          fi
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISHED_FILE"
+          git add -f "$PUBLISHED_FILE"
           if git diff --cached --quiet; then
-            echo "Beta branch artifact set unchanged; skipping publish."
+            echo "Beta artifact branch unchanged; skipping publish."
           else
             git commit -m "ci(beta): publish userscript [skip ci]"
-            git push origin HEAD:beta
+            git push origin HEAD:"$TARGET_BRANCH"
           fi
 
   publish-stable:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: stable-dist
+      PUBLISHED_FILE: dist/wme-place-harmonizer-row-edition.user.js
+      SOURCE_FILE: ${{ runner.temp }}/userscript-builds/prod/wme-place-harmonizer-row-edition.user.js
     defaults:
       run:
         working-directory: wme-place-harmonizer-row-edition
@@ -139,21 +152,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: wme-place-harmonizer-row-edition/artifact-download
+          path: ${{ runner.temp }}/userscript-builds
 
-      - name: Publish stable artifact to main branch
+      - name: Publish stable artifact to artifact branch
         run: |
-          mkdir -p dist
-          cp artifact-download/prod/wme-place-harmonizer-row-edition.user.js dist/
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.beta.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js
-          git rm -f --ignore-unmatch dist/wme-place-harmonizer-row-edition.dev.user.js.map
-          git add -f dist/wme-place-harmonizer-row-edition.user.js
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH"; then
+            git fetch origin "$TARGET_BRANCH"
+            git checkout -B "$TARGET_BRANCH" "origin/$TARGET_BRANCH"
+          else
+            git checkout --orphan "$TARGET_BRANCH"
+          fi
+          git rm -rf . >/dev/null 2>&1 || true
+          git clean -fdx
+          mkdir -p dist
+          cp "$SOURCE_FILE" "$PUBLISHED_FILE"
+          git add -f "$PUBLISHED_FILE"
           if git diff --cached --quiet; then
-            echo "Main branch artifact set unchanged; skipping publish."
+            echo "Stable artifact branch unchanged; skipping publish."
           else
             git commit -m "ci(main): publish stable userscript [skip ci]"
-            git push origin HEAD:main
+            git push origin HEAD:"$TARGET_BRANCH"
           fi

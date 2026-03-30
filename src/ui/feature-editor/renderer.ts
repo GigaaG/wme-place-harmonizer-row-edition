@@ -1,11 +1,19 @@
 import { ensureFeatureEditorContainer } from "./container";
-import type { PlaceIssue } from "../../types/issue";
+import type { PlaceIssue, IssueSeverity } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
 import {
   groupIssuesForFeatureEditor,
   type FeatureEditorIssueGroup
 } from "./issue-groups";
 import { t } from "../../i18n/runtime.ts";
+
+export interface PendingWhitelistRenderAction {
+  groupKey: string;
+  field: string;
+  severity: IssueSeverity;
+  message: string;
+  expiresInSeconds: number;
+}
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -325,12 +333,72 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   return html;
 }
 
+function renderPendingWhitelistAction(
+  action: PendingWhitelistRenderAction
+): string {
+  let html = "";
+  const colors = getSeverityColors(action.severity);
+
+  html += `
+    <div style="
+      border: 1px dashed ${colors.border};
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      background: ${colors.background};
+    ">
+  `;
+
+  html += `
+    <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
+      ${getSeverityIcon(action.severity)} ${escapeHtml(getSeverityLabel(action.severity))}: ${escapeHtml(action.message)}
+    </div>
+  `;
+
+  html += `
+    <div style="font-size:12px;color:#666;margin-bottom:4px;">
+      ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(action.field)}
+    </div>
+  `;
+
+  html += `
+    <div
+      class="wmeph-row-pending-whitelist-message"
+      data-group-key="${escapeHtml(action.groupKey)}"
+      style="font-size:12px; color:${colors.text};"
+    >
+      ${escapeHtml(
+        t("featureEditor.ignorePending", {
+          seconds: action.expiresInSeconds
+        })
+      )}
+    </div>
+  `;
+
+  html += `
+    <div style="margin-top:8px;">
+      <button
+        type="button"
+        class="wmeph-row-undo-whitelist"
+        data-group-key="${escapeHtml(action.groupKey)}"
+      >
+        ${escapeHtml(t("featureEditor.undoIgnore"))} (${action.expiresInSeconds}s)
+      </button>
+    </div>
+  `;
+
+  html += `</div>`;
+
+  return html;
+}
+
 export function renderFeatureEditorAnalysis(
   placeName: string,
   chainId: string | null,
   issues: PlaceIssue[],
   proposals: PlaceProposal[],
-  statusMessage?: { kind: "success" | "warning" | "error"; text: string }
+  statusMessage?: { kind: "success" | "warning" | "error"; text: string },
+  pendingWhitelistActions: PendingWhitelistRenderAction[] = []
 ): void {
   const container = ensureFeatureEditorContainer();
 
@@ -339,7 +407,13 @@ export function renderFeatureEditorAnalysis(
   }
 
   let html = "";
+  const pendingWhitelistActionsByGroupKey = new Map(
+    pendingWhitelistActions.map((action) => [action.groupKey, action])
+  );
   const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
+  const visibleIssueGroups = issueGroups.filter(
+    (group) => !pendingWhitelistActionsByGroupKey.has(group.key)
+  );
 
   html += `
   <div style="
@@ -352,11 +426,14 @@ export function renderFeatureEditorAnalysis(
     ${escapeHtml(t("featureEditor.title"))}
   </div>
 
-  <div style="
-    overflow-y:auto;
-    max-height:260px;
-    padding-right:4px;
-  ">
+  <div
+    data-wmeph-row-scroll-container="true"
+    style="
+      overflow-y:auto;
+      max-height:260px;
+      padding-right:4px;
+    "
+  >
   `;
 
   if (statusMessage) {
@@ -401,11 +478,14 @@ export function renderFeatureEditorAnalysis(
   html += `
     <div style="margin-bottom:8px;">
       <div><b>${escapeHtml(t("featureEditor.findings"))}</b></div>
-      <div>${issueGroups.length}</div>
+      <div>${visibleIssueGroups.length}</div>
     </div>
   `;
 
-  if (issueGroups.length === 0) {
+  if (
+    visibleIssueGroups.length === 0 &&
+    pendingWhitelistActions.length === 0
+  ) {
     html += `
       <div style="
         border: 1px solid #ddd;
@@ -418,12 +498,32 @@ export function renderFeatureEditorAnalysis(
       </div>
     `;
   } else {
+    const renderedPendingGroupKeys = new Set<string>();
+
     for (const group of issueGroups) {
+      const pendingWhitelistAction = pendingWhitelistActionsByGroupKey.get(group.key);
+
+      if (pendingWhitelistAction) {
+        renderedPendingGroupKeys.add(group.key);
+        html += renderPendingWhitelistAction(pendingWhitelistAction);
+        continue;
+      }
+
       html += renderIssue(group);
+    }
+
+    for (const pendingWhitelistAction of pendingWhitelistActions) {
+      if (renderedPendingGroupKeys.has(pendingWhitelistAction.groupKey)) {
+        continue;
+      }
+
+      html += renderPendingWhitelistAction(pendingWhitelistAction);
     }
   }
 
-  const hasApplyableProposals = proposals.some((proposal) => proposal.isApplySupported);
+  const hasApplyableProposals = visibleIssueGroups.some((group) =>
+    group.proposals.some((proposal) => proposal.isApplySupported)
+  );
 
   if (hasApplyableProposals) {
     html += `

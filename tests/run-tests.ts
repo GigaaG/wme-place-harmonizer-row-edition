@@ -16,6 +16,7 @@ import "./venue-updater.geometry.test.ts";
 import "./venue-updater.fields.test.ts";
 import "./venue-save-scan.test.ts";
 import "./whitelist-manager.test.ts";
+import "./whitelist-pending-actions.test.ts";
 import "./i18n-utils.test.ts";
 import "./runtime-data-loading.test.ts";
 import "./google-maps-validation-policy.test.ts";

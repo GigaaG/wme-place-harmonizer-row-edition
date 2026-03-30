@@ -27,7 +27,7 @@ npm run test
 
 ## Continuous Integration
 
-A GitHub Actions workflow verifies pull requests and branch pushes by running `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod`, then uploads the generated userscript artifacts. Publication is a separate post-merge step: on pushes to `beta`, CI publishes the beta userscript to the `beta-dist` artifact branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, CI publishes the stable userscript to the `stable-dist` artifact branch so Greasy Fork can sync from a fixed stable artifact URL. Source branches do not retain committed generated artifacts.
+A GitHub Actions workflow verifies pull requests and branch pushes by running `npm run check`, `npm run build:dev`, `npm run build:beta`, and `npm run build:prod`, then uploads the generated userscript artifacts. Publication is a separate post-merge step: on pushes to `beta`, CI republishes the verified beta userscript to the `beta-dist` artifact branch so Tampermonkey users can auto-update from a stable GitHub URL. On pushes to `main`, CI republishes the verified stable userscript to the `stable-dist` artifact branch so Greasy Fork can sync from a fixed stable artifact URL. Source branches stay free of committed generated userscript files, which avoids repeated merge conflicts during `dev -> beta -> main` promotion.
 
 ## Build modes
 
@@ -67,11 +67,11 @@ Switching the runtime channel changes the manifest within the active branch. It 
 4. Test in WME.
 5. Run `npm run check`.
 6. Bump `package.json` to the version you intend to release before you start a beta cycle.
-7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and publish the beta artifact to `beta-dist`, which testers track. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
+7. When you want a beta release, merge `dev` into `beta`. CI will verify the branch and republish the beta artifact that testers track to `beta-dist`. Run `npm run build:dev` and `npm run build:beta` locally if you want to inspect the generated beta file before or after the push.
 8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and let Greasy Fork sync the stable artifact from `stable-dist`.
 
 ## Release checklist
 
-Use the dedicated release checklist when promoting `beta` to `main` and publishing or syncing the stable release through Greasy Fork:
+Use the dedicated release checklist when promoting `beta` to `main` and syncing the stable release through Greasy Fork:
 
 - [docs/release-checklist.md](release-checklist.md)

@@ -22,7 +22,7 @@ Before opening the release PR, confirm all of the following:
 
 - [ ] `package.json` already contains the intended stable version
 - [ ] `beta` CI is green
-- [ ] the beta userscript has been published to the `beta-dist` artifact branch
+- [ ] the beta userscript has been republished to the `beta-dist` artifact branch
 - [ ] beta testers have accepted the current beta build
 - [ ] there are no known release-blocking issues left open
 
@@ -61,7 +61,7 @@ When the PR is approved:
 - [ ] merge `beta` into `main`
 - [ ] confirm the `main` branch CI workflow passes
 - [ ] confirm the production userscript artifact is available from the workflow run
-- [ ] confirm CI published `dist/wme-place-harmonizer-row-edition.user.js` to `stable-dist`
+- [ ] confirm CI republished `dist/wme-place-harmonizer-row-edition.user.js` to `stable-dist`
 
 ## Greasy Fork verification
 

@@ -108,7 +108,7 @@ Build outputs:
 
 Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
 
-Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the `beta-dist` artifact branch. Pull requests are verified before merge. After merge, pushes to `beta` publish the beta userscript to `beta-dist`, and pushes to `main` publish the stable userscript to `stable-dist` so Greasy Fork can sync from a fixed stable artifact URL. Source branches stay free of committed generated artifacts.
+Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the `beta-dist` artifact branch. Pull requests are verified before merge. After merge, pushes to `beta` republish the verified beta userscript to `beta-dist`, and pushes to `main` republish the verified stable userscript to `stable-dist` so Greasy Fork can sync from a fixed stable artifact URL. Source branches stay free of committed generated userscript files, which keeps `dev -> beta -> main` merges clean.
 
 This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
 
@@ -124,7 +124,7 @@ Recommended local workflow:
 4. Test the script in WME.
 5. Run `npm run check` before opening a pull request.
 6. Bump `package.json` to the version you plan to release before starting a beta cycle.
-7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and publish the beta userscript to `beta-dist`, which Tampermonkey testers track. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
+7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and republish the beta userscript that Tampermonkey tracks to `beta-dist`. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
 8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and let Greasy Fork sync the stable artifact from `stable-dist`.
 
 Further documentation:

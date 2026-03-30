@@ -215,7 +215,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   }
   const DATA_REPOSITORY_OWNER = "GigaaG";
   const DATA_REPOSITORY_NAME = "wme-place-harmonizer-row-data";
-  const DATA_REPOSITORY_BRANCH = IS_DEV_SCRIPT_BUILD ? "dev" : "main";
+  const DATA_REPOSITORY_BRANCH = SCRIPT_BUILD_CHANNEL === "stable" ? "main" : SCRIPT_BUILD_CHANNEL;
   function appendQueryParam(url, key, value) {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}${key}=${encodeURIComponent(value)}`;

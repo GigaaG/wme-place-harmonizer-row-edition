@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME Place Harmonizer ROW Edition (Beta)
 // @namespace    https://github.com/
-// @version      0.1.1-beta.23
+// @version      0.1.1-beta.38
 // @description  TypeScript userscript for Waze Map Editor ROW Edition place harmonization
 // @author       Contributors
 // @include      https://www.waze.com/editor*

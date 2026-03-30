@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME Place Harmonizer ROW Edition (Beta)
 // @namespace    https://github.com/
-// @version      0.1.1-beta.38
+// @version      0.1.1-beta.45
 // @description  TypeScript userscript for Waze Map Editor ROW Edition place harmonization
 // @author       Contributors
 // @include      https://www.waze.com/editor*
@@ -217,7 +217,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "beta";
   }
   const DATA_REPOSITORY_OWNER = "GigaaG";
   const DATA_REPOSITORY_NAME = "wme-place-harmonizer-row-data";
-  const DATA_REPOSITORY_BRANCH = IS_DEV_SCRIPT_BUILD ? "dev" : "main";
+  const DATA_REPOSITORY_BRANCH = SCRIPT_BUILD_CHANNEL === "stable" ? "main" : SCRIPT_BUILD_CHANNEL;
   function appendQueryParam(url, key, value) {
     const separator = url.includes("?") ? "&" : "?";
     return `${url}${separator}${key}=${encodeURIComponent(value)}`;

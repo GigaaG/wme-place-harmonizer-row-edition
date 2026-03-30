@@ -69,7 +69,7 @@ The script also supports scanning visible venues and highlighting them by severi
 
 ## Stable, Beta, and Development Channels
 
-Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Beta and development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
+Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Beta builds read data from the data repository `beta` branch and default to `manifest/dev.json`. Development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
 
 ## For Developers
 

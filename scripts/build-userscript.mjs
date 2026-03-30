@@ -21,6 +21,9 @@ const REPOSITORY_NAME = "wme-place-harmonizer-row-edition";
 const PUBLISHED_USERSCRIPT_FILE_NAME = "wme-place-harmonizer-row-edition.user.js";
 const BETA_PUBLISH_BRANCH = "beta-dist";
 
+const PUBLISHED_USERSCRIPT_FILE_NAME = "wme-place-harmonizer-row-edition.user.js";
+const BETA_PUBLISH_BRANCH = "beta-dist";
+
 function getBuildSequence() {
   return (
     process.env.GITHUB_RUN_NUMBER ??

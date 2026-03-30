@@ -91,7 +91,7 @@ jobs:
     env:
       TARGET_BRANCH: beta-dist
       PUBLISHED_FILE: dist/wme-place-harmonizer-row-edition.user.js
-      SOURCE_FILE: ${{ runner.temp }}/userscript-builds/beta/wme-place-harmonizer-row-edition.beta.user.js
+      SOURCE_FILE: ${{ github.workspace }}/userscript-builds/beta/wme-place-harmonizer-row-edition.beta.user.js
     defaults:
       run:
         working-directory: wme-place-harmonizer-row-edition
@@ -106,7 +106,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: ${{ runner.temp }}/userscript-builds
+          path: ${{ github.workspace }}/userscript-builds
 
       - name: Publish beta artifact to artifact branch
         run: |
@@ -137,7 +137,7 @@ jobs:
     env:
       TARGET_BRANCH: stable-dist
       PUBLISHED_FILE: dist/wme-place-harmonizer-row-edition.user.js
-      SOURCE_FILE: ${{ runner.temp }}/userscript-builds/prod/wme-place-harmonizer-row-edition.user.js
+      SOURCE_FILE: ${{ github.workspace }}/userscript-builds/prod/wme-place-harmonizer-row-edition.user.js
     defaults:
       run:
         working-directory: wme-place-harmonizer-row-edition
@@ -152,7 +152,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: userscript-builds
-          path: ${{ runner.temp }}/userscript-builds
+          path: ${{ github.workspace }}/userscript-builds
 
       - name: Publish stable artifact to artifact branch
         run: |

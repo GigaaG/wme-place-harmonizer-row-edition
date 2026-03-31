@@ -1,10 +1,10 @@
-import { ensureFeatureEditorContainer } from "./container";
+import { ensureFeatureEditorContainer } from "./container.ts";
 import type { PlaceIssue, IssueSeverity } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
 import {
   groupIssuesForFeatureEditor,
   type FeatureEditorIssueGroup
-} from "./issue-groups";
+} from "./issue-groups.ts";
 import { t } from "../../i18n/runtime.ts";
 
 export interface PendingWhitelistRenderAction {
@@ -65,6 +65,41 @@ function getSeverityColors(severity: string): {
     background: "#f1f8ff",
     text: "#0b5394"
   };
+}
+
+function getInlineActionButtonStyle(color: string): string {
+  return [
+    "background:none",
+    "border:none",
+    "padding:0",
+    "margin:0",
+    `color:${color}`,
+    "font-size:12px",
+    "font-weight:600",
+    "line-height:1.2",
+    "cursor:pointer",
+    "text-decoration:underline",
+    "text-underline-offset:2px",
+    "white-space:nowrap"
+  ].join(";");
+}
+
+function renderIssueCardFooter(
+  content: string,
+  justifyContent = "flex-end"
+): string {
+  return `
+    <div style="
+      margin-top:8px;
+      display:flex;
+      align-items:center;
+      justify-content:${justifyContent};
+      gap:8px;
+      min-height:16px;
+    ">
+      ${content}
+    </div>
+  `;
 }
 
 function escapeHtml(value: unknown): string {
@@ -315,17 +350,16 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   }
 
   if (canWhitelist) {
-    html += `
-      <div style="margin-top:8px;">
-        <button
-          type="button"
-          class="wmeph-row-whitelist-issue"
-          data-group-key="${escapeHtml(group.key)}"
-        >
-          ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
-        </button>
-      </div>
-    `;
+    html += renderIssueCardFooter(`
+      <button
+        type="button"
+        class="wmeph-row-whitelist-issue"
+        data-group-key="${escapeHtml(group.key)}"
+        style="${getInlineActionButtonStyle(colors.text)}"
+      >
+        ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
+      </button>
+    `);
   }
 
   html += `</div>`;
@@ -346,6 +380,7 @@ function renderPendingWhitelistAction(
       padding: 8px;
       margin-top: 8px;
       background: ${colors.background};
+      opacity: 0.92;
     ">
   `;
 
@@ -361,31 +396,26 @@ function renderPendingWhitelistAction(
     </div>
   `;
 
-  html += `
-    <div
-      class="wmeph-row-pending-whitelist-message"
-      data-group-key="${escapeHtml(action.groupKey)}"
-      style="font-size:12px; color:${colors.text};"
-    >
-      ${escapeHtml(
-        t("featureEditor.ignorePending", {
-          seconds: action.expiresInSeconds
-        })
-      )}
-    </div>
-  `;
-
-  html += `
-    <div style="margin-top:8px;">
+  html += renderIssueCardFooter(
+    `
+      <span
+        class="wmeph-row-pending-whitelist-message"
+        data-group-key="${escapeHtml(action.groupKey)}"
+        style="font-size:12px; color:${colors.text};"
+      >
+        ${escapeHtml(t("featureEditor.ignorePending"))}
+      </span>
       <button
         type="button"
         class="wmeph-row-undo-whitelist"
         data-group-key="${escapeHtml(action.groupKey)}"
+        style="${getInlineActionButtonStyle(colors.text)}"
       >
         ${escapeHtml(t("featureEditor.undoIgnore"))} (${action.expiresInSeconds}s)
       </button>
-    </div>
-  `;
+    `,
+    "space-between"
+  );
 
   html += `</div>`;
 
@@ -411,9 +441,15 @@ export function renderFeatureEditorAnalysis(
     pendingWhitelistActions.map((action) => [action.groupKey, action])
   );
   const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
+  const issueGroupKeys = new Set(issueGroups.map((group) => group.key));
   const visibleIssueGroups = issueGroups.filter(
     (group) => !pendingWhitelistActionsByGroupKey.has(group.key)
   );
+  const displayedFindingCount =
+    issueGroups.length +
+    pendingWhitelistActions.filter(
+      (action) => !issueGroupKeys.has(action.groupKey)
+    ).length;
 
   html += `
   <div style="
@@ -478,14 +514,11 @@ export function renderFeatureEditorAnalysis(
   html += `
     <div style="margin-bottom:8px;">
       <div><b>${escapeHtml(t("featureEditor.findings"))}</b></div>
-      <div>${visibleIssueGroups.length}</div>
+      <div>${displayedFindingCount}</div>
     </div>
   `;
 
-  if (
-    visibleIssueGroups.length === 0 &&
-    pendingWhitelistActions.length === 0
-  ) {
+  if (displayedFindingCount === 0) {
     html += `
       <div style="
         border: 1px solid #ddd;

@@ -463,9 +463,7 @@ function refreshPendingWhitelistCountdowns(venueId: string): void {
     );
 
     if (message) {
-      message.textContent = t("featureEditor.ignorePending", {
-        seconds: action.expiresInSeconds
-      });
+      message.textContent = t("featureEditor.ignorePending");
     }
 
     const button = document.querySelector<HTMLButtonElement>(

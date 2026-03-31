@@ -12,6 +12,7 @@ import "./external-provider-validation.test.ts";
 import "./external-provider-editor.test.ts";
 import "./feature-editor-grouping.test.ts";
 import "./feature-editor-actions.test.ts";
+import "./feature-editor-renderer.test.ts";
 import "./venue-updater.geometry.test.ts";
 import "./venue-updater.fields.test.ts";
 import "./venue-save-scan.test.ts";

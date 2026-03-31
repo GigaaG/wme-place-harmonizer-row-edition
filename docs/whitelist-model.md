@@ -73,6 +73,8 @@ Whitelist filtering happens after issues and proposals are generated.
 
 The runtime validates the whitelist store structure on load. If the stored data is missing, malformed, or incompatible with version `1`, the runtime resets to an empty whitelist store instead of throwing.
 
+The runtime also prunes stale entries for the currently analyzed place when their stored config or chains snapshot no longer matches the active runtime snapshot.
+
 ## Current non-features
 
 The current whitelist implementation does not support:

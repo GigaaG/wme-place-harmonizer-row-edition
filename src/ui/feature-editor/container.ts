@@ -1,4 +1,4 @@
-import { logger } from "../../logging/logger";
+import { logger } from "../../logging/logger.ts";
 
 const CONTAINER_ID = "wmeph-row-feature-editor";
 

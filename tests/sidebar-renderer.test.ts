@@ -28,6 +28,7 @@ function buildSidebarState(googleValidationEnabled: boolean): SidebarDebugState 
     runtimeChainsCount: 1,
     highlightsEnabled: true,
     autoScanVisibleVenues: true,
+    disableNaturalFeaturesHighlighting: false,
     googleMapsValidation: {
       enabled: googleValidationEnabled,
       checks: buildGoogleMapsValidationChecks()
@@ -162,4 +163,21 @@ await runTest("hides Google validation child settings when validation is disable
 
   assert.equal(html.includes("Enabled checks"), false);
   assert.equal(html.includes("wmeph-row-google-validation-notFound"), false);
+});
+
+await runTest("renders the natural-features highlight toggle", async () => {
+  const html = await renderSidebarHtml({
+    ...buildSidebarState(true),
+    disableNaturalFeaturesHighlighting: true
+  });
+
+  assert.equal(html.includes("wmeph-row-natural-features-highlight-toggle"), true);
+  assert.equal(
+    html.includes("Disable NATURAL_FEATURES highlighting (including child categories)"),
+    true
+  );
+  assert.match(
+    html,
+    /id="wmeph-row-natural-features-highlight-toggle"[^>]*checked/
+  );
 });

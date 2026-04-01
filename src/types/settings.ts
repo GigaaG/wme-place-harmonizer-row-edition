@@ -31,5 +31,6 @@ export interface UserSettings {
   debugEnabled: boolean;
   fallbackCountry?: string;
   autoScanVisibleVenues: boolean;
+  disableNaturalFeaturesHighlighting: boolean;
   googleMapsValidation: GoogleMapsValidationSettings;
 }

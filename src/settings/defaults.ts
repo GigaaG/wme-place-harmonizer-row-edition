@@ -7,6 +7,7 @@ export function getDefaultSettings(): UserSettings {
     debugEnabled: false,
     fallbackCountry: undefined,
     autoScanVisibleVenues: true,
+    disableNaturalFeaturesHighlighting: false,
     googleMapsValidation: {
       enabled: true,
       checks: {

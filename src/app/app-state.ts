@@ -19,6 +19,7 @@ export interface SidebarDebugState {
   };
   highlightsEnabled?: boolean;
   autoScanVisibleVenues?: boolean;
+  disableNaturalFeaturesHighlighting?: boolean;
   googleMapsValidation?: GoogleMapsValidationSettings;
   googleMapsValidationAvailability?: GoogleMapsValidationAvailability;
 }

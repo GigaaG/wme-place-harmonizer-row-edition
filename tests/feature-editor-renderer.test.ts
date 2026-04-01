@@ -102,10 +102,13 @@ runTest("renders ignore as a compact inline action", () => {
     proposals: [buildProposal()]
   });
 
+  assert.equal((html.match(/class="wmeph-row-apply-checkbox"/g) ?? []).length, 1);
   assert.equal(html.includes('class="wmeph-row-whitelist-issue"'), true);
   assert.match(html, />\s*Ignore\s*</);
   assert.equal(html.includes("Ignore for this venue"), false);
-  assert.equal(html.includes("justify-content:flex-end"), true);
+  assert.equal(html.includes("justify-content:space-between"), true);
+  assert.equal(html.includes("flex-wrap:wrap"), true);
+  assert.equal(html.includes('display:block;margin-top:6px;'), false);
   assert.equal(html.includes("background:none;border:none;padding:0"), true);
 });
 

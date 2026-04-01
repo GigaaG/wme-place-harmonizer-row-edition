@@ -92,10 +92,11 @@ function renderIssueCardFooter(
     <div style="
       margin-top:8px;
       display:flex;
+      flex-wrap:wrap;
       align-items:center;
       justify-content:${justifyContent};
-      gap:8px;
-      min-height:16px;
+      column-gap:8px;
+      row-gap:4px;
     ">
       ${content}
     </div>
@@ -153,7 +154,8 @@ function formatLinkedProposalValue(
 function renderProposal(
   issue: PlaceIssue,
   proposal: PlaceProposal,
-  index: number
+  index: number,
+  renderApplyControl = true
 ): string {
   let html = "";
 
@@ -202,7 +204,7 @@ function renderProposal(
     `;
   }
 
-  if (proposal.isApplySupported) {
+  if (proposal.isApplySupported && renderApplyControl) {
     html += `
       <label style="display:block;margin-top:6px;">
         <input
@@ -316,6 +318,13 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   let html = "";
   const colors = getSeverityColors(group.severity);
   const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
+  const shouldRenderSharedFooterCheckbox =
+    !shouldRenderAsSingleChoiceGroup(group) &&
+    group.proposals.length === 1 &&
+    group.proposals[0].isApplySupported;
+  const footerCheckboxProposal = shouldRenderSharedFooterCheckbox
+    ? group.proposals[0]
+    : null;
 
   html += `
     <div style="
@@ -345,21 +354,57 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
     html += renderExternalProviderChoiceGroup(group.issues[0], group);
   } else {
     for (let index = 0; index < group.proposals.length; index += 1) {
-      html += renderProposal(group.issues[0], group.proposals[index], index);
+      html += renderProposal(
+        group.issues[0],
+        group.proposals[index],
+        index,
+        !footerCheckboxProposal
+      );
     }
   }
 
-  if (canWhitelist) {
-    html += renderIssueCardFooter(`
-      <button
-        type="button"
-        class="wmeph-row-whitelist-issue"
-        data-group-key="${escapeHtml(group.key)}"
-        style="${getInlineActionButtonStyle(colors.text)}"
-      >
-        ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
-      </button>
-    `);
+  if (footerCheckboxProposal || canWhitelist) {
+    let footerContent = "";
+
+    if (footerCheckboxProposal) {
+      footerContent += `
+        <label style="
+          display:flex;
+          align-items:center;
+          gap:4px;
+          font-size:12px;
+          font-weight:600;
+          margin:0;
+          flex:1 1 auto;
+          min-width:0;
+        ">
+          <input
+            type="checkbox"
+            class="wmeph-row-apply-checkbox"
+            data-proposal-id="${escapeHtml(footerCheckboxProposal.id ?? "")}"
+          />
+          <span>${escapeHtml(t("featureEditor.applyThisFix"))}</span>
+        </label>
+      `;
+    }
+
+    if (canWhitelist) {
+      footerContent += `
+        <button
+          type="button"
+          class="wmeph-row-whitelist-issue"
+          data-group-key="${escapeHtml(group.key)}"
+          style="${getInlineActionButtonStyle(colors.text)}"
+        >
+          ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
+        </button>
+      `;
+    }
+
+    html += renderIssueCardFooter(
+      footerContent,
+      footerCheckboxProposal && canWhitelist ? "space-between" : "flex-end"
+    );
   }
 
   html += `</div>`;

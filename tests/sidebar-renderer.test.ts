@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import "./test-i18n.ts";
 import { renderSidebarDebugPanel } from "../src/ui/sidebar/renderer.ts";
 import { removeScriptSidebarTab } from "../src/ui/sidebar/script-tab.ts";
 import type { SidebarDebugState } from "../src/app/app-state.ts";
@@ -140,6 +141,20 @@ await runTest("renders Google validation child settings when validation is enabl
 
   assert.equal(html.includes("Enabled checks"), true);
   assert.equal(html.includes("wmeph-row-google-validation-notFound"), true);
+});
+
+await runTest("moves debug metadata into the info tooltip", async () => {
+  const html = await renderSidebarHtml(buildSidebarState(true));
+
+  assert.equal(html.includes('id="wmeph-row-debug-info"'), true);
+  assert.equal(html.includes("Channel: dev"), true);
+  assert.equal(html.includes("Manifest: 1.0.0 / rev-test"), true);
+  assert.equal(html.includes("Runtime Config: global v1"), true);
+  assert.equal(html.includes("Chains: global (1)"), true);
+  assert.equal(html.includes("<b>Channel</b><br>"), false);
+  assert.equal(html.includes("<b>Manifest</b><br>"), false);
+  assert.equal(html.includes("<b>Runtime Config</b><br>"), false);
+  assert.equal(html.includes("<b>Chains</b><br>"), false);
 });
 
 await runTest("hides Google validation child settings when validation is disabled", async () => {

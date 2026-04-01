@@ -77,6 +77,14 @@ export async function renderSidebarDebugPanel(
     <div style="margin-bottom:8px;">
       <b>${escapeHtml(t("sidebar.highlights"))}</b><br>
       ${escapeHtml(state.highlightsEnabled ? t("common.enabled") : t("common.disabled"))}
+      <label style="font-size:12px;display:block;margin-top:4px;">
+        <input
+          id="wmeph-row-natural-features-highlight-toggle"
+          type="checkbox"
+          ${state.disableNaturalFeaturesHighlighting ? "checked" : ""}
+        />
+        ${escapeHtml(t("sidebar.highlights.disableNaturalFeatures"))}
+      </label>
     </div>
   `;
 

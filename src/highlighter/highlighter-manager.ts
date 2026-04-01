@@ -2,6 +2,7 @@ import { logger } from "../logging/logger";
 import { getWmeSdk } from "../integration/sdk/wme";
 import type { VisibleVenueScanSummary, ScannedVenueResult } from "../types/scan";
 import { t } from "../i18n/runtime.ts";
+import { shouldSkipVenueHighlight } from "./highlight-category-filter.ts";
 
 const HIGHLIGHT_LAYER_NAME = "wmeph-row-visible-venues";
 const MIN_POINT_HIGHLIGHT_ZOOM = 17;
@@ -17,6 +18,7 @@ let highlightedFeatureIds: string[] = [];
 
 interface HighlightRenderOptions {
   keepExistingOnEmpty?: boolean;
+  disableNaturalFeaturesHighlighting?: boolean;
 }
 
 export interface HighlightRenderResult {
@@ -411,11 +413,22 @@ export function renderHighlights(
   const polygonOutlineFeatures: any[] = [];
   const pointFeatures: any[] = [];
   const nextFeatureIds: string[] = [];
+  let suppressedBySettingsCount = 0;
 
   for (const result of summary.results) {
     const venue = venueMap.get(String(result.venueId));
 
     if (!venue) {
+      continue;
+    }
+
+    if (
+      shouldSkipVenueHighlight(
+        venue,
+        options.disableNaturalFeaturesHighlighting === true
+      )
+    ) {
+      suppressedBySettingsCount += 1;
       continue;
     }
 
@@ -453,7 +466,8 @@ export function renderHighlights(
     if (
       options.keepExistingOnEmpty &&
       allowPointHighlights &&
-      highlightedFeatureIds.length > 0
+      highlightedFeatureIds.length > 0 &&
+      suppressedBySettingsCount === 0
     ) {
       logger.info("No drawable highlights, keeping existing rendered layer");
       return {

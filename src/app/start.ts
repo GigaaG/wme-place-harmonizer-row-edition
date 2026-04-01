@@ -48,16 +48,17 @@ import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
 import {
   wireSidebarPanelActions,
   wireSidebarReloadButton,
+  wireSidebarScanButton,
+  wireSidebarAutoScanToggle,
+  wireSidebarNaturalFeaturesHighlightToggle,
   wireSidebarGoogleMapsValidationChecks,
   wireSidebarGoogleMapsValidationToggle
 } from "../ui/sidebar/actions";
 import { getVisibleVenues } from "../integration/sdk/visible-venues";
 import { scanVisibleVenues } from "./scan-visible-venues";
-import { wireSidebarScanButton } from "../ui/sidebar/actions";
 import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";
 import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
 import { registerVenueSaveScanListener } from "../integration/sdk/venue-save-scan";
-import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
 import { normalizeCountryCode } from "../config/country-code";
 import { DATA_REPOSITORY_BRANCH } from "../config/source";
 import {
@@ -807,6 +808,42 @@ async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
   }
 }
 
+async function setDisableNaturalFeaturesHighlighting(
+  enabled: boolean
+): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn(
+      "Cannot update NATURAL_FEATURES highlight setting: runtime settings unavailable"
+    );
+    return;
+  }
+
+  runtimeSettings = {
+    ...runtimeSettings,
+    disableNaturalFeaturesHighlighting: enabled
+  };
+
+  settingsManager.save(runtimeSettings);
+
+  const statusText = enabled
+    ? t("status.naturalFeaturesHighlighting.disabled")
+    : t("status.naturalFeaturesHighlighting.enabled");
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
+      disableNaturalFeaturesHighlighting: enabled,
+      lastStatus: statusText
+    });
+
+    await rerenderSidebar();
+  }
+
+  await scanVisibleVenuesFromMap("manual", statusText);
+}
+
 function hasEnabledGoogleMapsValidationChecks(): boolean {
   const checks = getEffectiveRuntimeGoogleMapsValidationSettings()?.checks;
 
@@ -955,6 +992,10 @@ async function rerenderSidebar(): Promise<void> {
     !!state.autoScanVisibleVenues,
     setAutoScanVisibleVenues
   );
+  wireSidebarNaturalFeaturesHighlightToggle(
+    !!state.disableNaturalFeaturesHighlighting,
+    setDisableNaturalFeaturesHighlighting
+  );
   wireSidebarGoogleMapsValidationToggle(
     state.googleMapsValidation?.enabled ?? true,
     setGoogleMapsValidationEnabled
@@ -968,7 +1009,8 @@ async function rerenderSidebar(): Promise<void> {
 }
 
 async function scanVisibleVenuesFromMap(
-  trigger: "manual" | "auto" = "manual"
+  trigger: "manual" | "auto" = "manual",
+  statusOverride?: string
 ): Promise<void> {
   if (!runtimeConfig || !runtimeChains) {
     logger.warn("Cannot scan visible venues: runtime not initialized");
@@ -1017,12 +1059,16 @@ async function scanVisibleVenuesFromMap(
   });
 
   const highlightRenderResult = renderHighlights(summary, venues, {
-    keepExistingOnEmpty: trigger === "auto"
+    keepExistingOnEmpty: trigger === "auto",
+    disableNaturalFeaturesHighlighting:
+      runtimeSettings?.disableNaturalFeaturesHighlighting === true
   });
 
-  let statusText = t("status.scannedVisibleVenues", {
-    count: summary.total
-  });
+  let statusText =
+    statusOverride ??
+    t("status.scannedVisibleVenues", {
+      count: summary.total
+    });
 
   if (highlightRenderResult.keptExisting) {
     statusText = t("status.autoScanKeptHighlights");
@@ -1632,6 +1678,8 @@ export async function startApplication(): Promise<void> {
     lastStatus: t("status.ready"),
     highlightsEnabled: true,
     autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true,
+    disableNaturalFeaturesHighlighting:
+      runtimeSettings?.disableNaturalFeaturesHighlighting ?? false,
     ...buildGoogleMapsValidationSidebarState()
   });
 

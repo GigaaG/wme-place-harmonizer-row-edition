@@ -22,3 +22,4 @@ import "./i18n-utils.test.ts";
 import "./runtime-data-loading.test.ts";
 import "./google-maps-validation-policy.test.ts";
 import "./sidebar-renderer.test.ts";
+import "./highlight-category-filter.test.ts";

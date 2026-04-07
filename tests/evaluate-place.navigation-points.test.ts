@@ -31,6 +31,32 @@ runTest("flags missing navigation points for polygon venues when required", () =
   assert.equal(issues[0].expectedValue, "present");
 });
 
+runTest("treats optional navigation points as neutral for polygon venues", () => {
+  const missingIssues = evaluatePlace(
+    {
+      name: "Test Polygon Venue",
+      geometry: "polygon",
+      navigationPointCount: 0
+    },
+    {
+      navigationPoints: "optional"
+    }
+  );
+  const presentIssues = evaluatePlace(
+    {
+      name: "Test Polygon Venue",
+      geometry: "polygon",
+      navigationPointCount: 2
+    },
+    {
+      navigationPoints: "optional"
+    }
+  );
+
+  assert.deepEqual(missingIssues, []);
+  assert.deepEqual(presentIssues, []);
+});
+
 runTest("does not flag point venues for missing navigation points", () => {
   const place: PlaceLike = {
     name: "Test Point Venue",

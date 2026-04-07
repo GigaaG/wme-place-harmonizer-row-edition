@@ -100,6 +100,14 @@ runTest("keeps presence and format validation independent", () => {
   );
 });
 
+runTest("treats optional URL presence as neutral", () => {
+  assert.deepEqual(getUrlIssueRuleIds(undefined, { url: "optional" }), []);
+  assert.deepEqual(
+    getUrlIssueRuleIds("https://www.casca.nl", { url: "optional" }),
+    []
+  );
+});
+
 runTest("creates applyable URL-format proposals when adding https fixes it", () => {
   const issue = getUrlFormatIssue("tickets.example.nl/en");
 

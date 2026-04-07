@@ -51,6 +51,29 @@ runTest("flags required opening hours when missing", () => {
   assert.equal(issues[0].expectedValue, "present");
 });
 
+runTest("treats optional opening hours as neutral", () => {
+  const missingIssues = evaluatePlace(
+    {
+      name: "Test Place"
+    },
+    {
+      openingHours: "optional"
+    }
+  );
+  const presentIssues = evaluatePlace(
+    {
+      name: "Test Place",
+      openingHours: template
+    },
+    {
+      openingHours: "optional"
+    }
+  );
+
+  assert.deepEqual(missingIssues, []);
+  assert.deepEqual(presentIssues, []);
+});
+
 runTest("shows a warning when chain opening-hours template exists but venue has none", () => {
   const place: PlaceLike = {
     name: "Test Place"

@@ -379,3 +379,71 @@ runTest("subcategory overrides main category across overlapping policy fields", 
     }
   });
 });
+
+runTest("optional child presence rules clear inherited category requirements", () => {
+  const optionalHierarchyConfig: HarmonizerConfig = {
+    id: "optional-hierarchy-config",
+    type: "country-config",
+    version: 1,
+    categoryStandards: {
+      OPTIONAL_PARENT: {
+        phone: "required",
+        url: "recommended",
+        openingHours: "required",
+        navigationPoints: "required",
+        externalProviderIds: "required",
+        address: {
+          city: "required",
+          street: "required",
+          houseNumber: "recommended"
+        }
+      },
+      OPTIONAL_CHILD: {
+        phone: "optional",
+        url: "optional",
+        openingHours: "optional",
+        navigationPoints: "optional",
+        externalProviderIds: "optional",
+        address: {
+          city: "optional",
+          street: "optional",
+          houseNumber: "optional"
+        }
+      }
+    }
+  };
+  const rawCategories = [
+    {
+      categoryId: "OPTIONAL_PARENT",
+      subCategoryId: "OPTIONAL_CHILD",
+      localizedName: "Optional child"
+    }
+  ];
+  const normalizedCategories = normalizeCategoryKeys(rawCategories);
+  const categoryStandards = normalizedCategories
+    .map((category) => optionalHierarchyConfig.categoryStandards?.[category])
+    .filter((standard) => standard !== undefined);
+  const policy = resolveEffectivePolicy({ categoryStandards });
+  const issues = evaluatePlace(
+    {
+      name: "Optional Place",
+      categories: normalizedCategories,
+      geometry: "polygon",
+      address: {}
+    },
+    policy
+  );
+
+  assert.deepEqual(normalizedCategories, ["OPTIONAL_PARENT", "OPTIONAL_CHILD"]);
+  assert.equal(policy.phone, "optional");
+  assert.equal(policy.url, "optional");
+  assert.equal(policy.openingHours, "optional");
+  assert.equal(policy.navigationPoints, "optional");
+  assert.equal(policy.externalProviderIds, "optional");
+  assert.deepEqual(policy.address, {
+    city: "optional",
+    street: "optional",
+    houseNumber: "optional"
+  });
+  assert.deepEqual(issues, []);
+});

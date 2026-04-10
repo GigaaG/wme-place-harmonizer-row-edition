@@ -9,8 +9,10 @@ import { t } from "../../i18n/runtime.ts";
 
 const MAX_EXTERNAL_PROVIDER_SUGGESTIONS = 5;
 const MIN_NAME_SCORE = 0.55;
-const MAX_SUGGESTION_DISTANCE_METERS = 500;
-const ABSOLUTE_MAX_SUGGESTION_DISTANCE_METERS = 1000;
+// Keep Google suggestions tightly local so nearby-name matches from other cities
+// do not surface as proposals for venues without an external provider.
+const MAX_SUGGESTION_DISTANCE_METERS = 300;
+const ABSOLUTE_MAX_SUGGESTION_DISTANCE_METERS = 300;
 
 interface SearchOrigin {
   lon: number;
@@ -23,6 +25,46 @@ export interface ExternalProviderCandidate {
   address?: string;
   location?: SearchOrigin;
   sortIndex?: number;
+}
+
+function tokenizeAddress(value: string | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  return normalizeText(value)
+    .split(" ")
+    .filter((token) => token.length >= 2);
+}
+
+export function filterEditorCandidatesByVenueAddress(
+  venueAddress: { city?: string } | undefined,
+  candidates: ExternalProviderCandidate[]
+): ExternalProviderCandidate[] {
+  if (candidates.length === 0) {
+    return candidates;
+  }
+
+  const cityTokens = tokenizeAddress(venueAddress?.city);
+
+  if (cityTokens.length === 0) {
+    return candidates;
+  }
+
+  const filtered = candidates.filter((candidate) => {
+    const localityTokens = new Set([
+      ...tokenizeAddress(candidate.name),
+      ...tokenizeAddress(candidate.address)
+    ]);
+
+    if (localityTokens.size === 0) {
+      return false;
+    }
+
+    return cityTokens.every((token) => localityTokens.has(token));
+  });
+
+  return filtered.length > 0 ? filtered : candidates;
 }
 
 // Uses the legacy PlacesService nearbySearch `type` filter, so values must be
@@ -721,7 +763,10 @@ function runTextSearch(
 
 export async function findSuggestedExternalProviders(
   venue: any,
-  query: string
+  query: string,
+  options?: {
+    venueAddress?: { city?: string };
+  }
 ): Promise<ExternalProviderSuggestion[]> {
   const searchQuery = query.trim();
 
@@ -820,7 +865,10 @@ export async function findSuggestedExternalProviders(
     logger.info("Google Places service unavailable on host window; falling back to editor autocomplete suggestions");
   }
 
-  const editorCandidates = await findExternalProviderEditorCandidates(searchQuery);
+  const editorCandidates = filterEditorCandidatesByVenueAddress(
+    options?.venueAddress,
+    await findExternalProviderEditorCandidates(searchQuery)
+  );
   return rankExternalProviderSuggestions(
     searchQuery,
     origin,

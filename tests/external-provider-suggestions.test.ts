@@ -7,6 +7,7 @@ import {
   buildExternalProviderSuggestionProposals,
   CATEGORY_GOOGLE_PLACE_TYPE_MAP,
   CATEGORY_GOOGLE_VALIDATION_TYPE_MAP,
+  filterEditorCandidatesByVenueAddress,
   rankExternalProviderSuggestions,
   resolveNearbySearchTypes,
   scoreExternalProviderName
@@ -182,6 +183,101 @@ runTest("keeps only the top five ranked nearby provider suggestions", () => {
   assert.deepEqual(
     suggestions.map((suggestion) => suggestion.providerId),
     ["provider-1", "provider-2", "provider-3", "provider-4", "provider-5"]
+  );
+});
+
+runTest("filters out exact-name Google matches outside the local search radius", () => {
+  const suggestions = rankExternalProviderSuggestions(
+    "Albert Heijn",
+    { lon: 4.9, lat: 52.37 },
+    [
+      {
+        providerId: "nearby",
+        name: "Albert Heijn",
+        address: "Address 1",
+        location: { lon: 4.9002, lat: 52.37 }
+      },
+      {
+        providerId: "too-far",
+        name: "Albert Heijn",
+        address: "Address 2",
+        location: { lon: 4.907, lat: 52.37 }
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    suggestions.map((suggestion) => suggestion.providerId),
+    ["nearby"]
+  );
+});
+
+runTest("filters editor autocomplete candidates to the venue city", () => {
+  const candidates = filterEditorCandidatesByVenueAddress(
+    { city: "Alkmaar" },
+    [
+      {
+        providerId: "alkmaar",
+        name: "Autotaalglas Alkmaar",
+        address: "Fluorietweg, Alkmaar, Nederland",
+        sortIndex: 0
+      },
+      {
+        providerId: "hoorn",
+        name: "Autotaalglas Hoorn",
+        address: "Oostergouw, Zwaag, Nederland",
+        sortIndex: 1
+      },
+      {
+        providerId: "zaandam",
+        name: "Autotaalglas Zaandam",
+        address: "Pieter Ghijsenlaan, Zaandam, Nederland",
+        sortIndex: 2
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.providerId),
+    ["alkmaar"]
+  );
+});
+
+runTest("matches editor autocomplete candidates when the venue city is only present in the name", () => {
+  const candidates = filterEditorCandidatesByVenueAddress(
+    { city: "Alkmaar" },
+    [
+      {
+        providerId: "alkmaar",
+        name: "Autotaalglas Alkmaar",
+        address: "Fluorietweg, Noord-Holland, Nederland",
+        sortIndex: 0
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.providerId),
+    ["alkmaar"]
+  );
+});
+
+runTest("keeps editor autocomplete candidates when none match the venue city", () => {
+  const candidates = filterEditorCandidatesByVenueAddress(
+    { city: "Alkmaar" },
+    [
+      {
+        providerId: "hoorn",
+        name: "Autotaalglas Hoorn",
+        address: "Oostergouw, Zwaag, Nederland",
+        sortIndex: 0
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.providerId),
+    ["hoorn"]
   );
 });
 

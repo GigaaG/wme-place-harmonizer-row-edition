@@ -6,6 +6,7 @@ import {
   buildSuggestedExternalProviderIssueMessage,
   buildExternalProviderSuggestionProposals,
   CATEGORY_GOOGLE_PLACE_TYPE_MAP,
+  CATEGORY_GOOGLE_VALIDATION_TYPE_MAP,
   rankExternalProviderSuggestions,
   resolveNearbySearchTypes,
   scoreExternalProviderName
@@ -55,6 +56,20 @@ runTest("covers every official WME venue category in the Google nearbySearch map
   ) as { categoryIds: string[] };
   const missingCategories = sdkValues.categoryIds.filter(
     (categoryId) => !(categoryId in CATEGORY_GOOGLE_PLACE_TYPE_MAP)
+  );
+
+  assert.deepEqual(missingCategories, []);
+});
+
+runTest("covers every official WME venue category in the Google validation map", () => {
+  const sdkValues = JSON.parse(
+    readFileSync(
+      new URL("../../wme-place-harmonizer-row-data/reference/sdk-values.json", import.meta.url),
+      "utf8"
+    )
+  ) as { categoryIds: string[] };
+  const missingCategories = sdkValues.categoryIds.filter(
+    (categoryId) => !(categoryId in CATEGORY_GOOGLE_VALIDATION_TYPE_MAP)
   );
 
   assert.deepEqual(missingCategories, []);

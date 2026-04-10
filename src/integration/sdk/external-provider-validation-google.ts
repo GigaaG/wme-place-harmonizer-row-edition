@@ -61,6 +61,104 @@ function collectLonLatPairs(value: unknown, points: number[][] = []): number[][]
   return points;
 }
 
+function isLonLatPair(value: unknown): value is [number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    typeof value[0] === "number" &&
+    typeof value[1] === "number"
+  );
+}
+
+function normalizeRingCoordinates(value: unknown): [number, number][] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isLonLatPair);
+}
+
+function isPointOnSegment(
+  point: SearchOrigin,
+  start: [number, number],
+  end: [number, number]
+): boolean {
+  const cross =
+    (point.lon - start[0]) * (end[1] - start[1]) -
+    (point.lat - start[1]) * (end[0] - start[0]);
+
+  if (Math.abs(cross) > 1e-12) {
+    return false;
+  }
+
+  const minLon = Math.min(start[0], end[0]);
+  const maxLon = Math.max(start[0], end[0]);
+  const minLat = Math.min(start[1], end[1]);
+  const maxLat = Math.max(start[1], end[1]);
+
+  return (
+    point.lon >= minLon &&
+    point.lon <= maxLon &&
+    point.lat >= minLat &&
+    point.lat <= maxLat
+  );
+}
+
+function isPointInRing(point: SearchOrigin, ring: [number, number][]): boolean {
+  if (ring.length < 3) {
+    return false;
+  }
+
+  let inside = false;
+
+  for (let index = 0; index < ring.length; index += 1) {
+    const current = ring[index];
+    const next = ring[(index + 1) % ring.length];
+
+    if (isPointOnSegment(point, current, next)) {
+      return true;
+    }
+
+    const intersects =
+      (current[1] > point.lat) !== (next[1] > point.lat) &&
+      point.lon <
+        ((next[0] - current[0]) * (point.lat - current[1])) /
+          (next[1] - current[1]) +
+          current[0];
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+function isPointInPolygonCoordinates(
+  point: SearchOrigin,
+  coordinates: unknown
+): boolean {
+  if (!Array.isArray(coordinates) || coordinates.length === 0) {
+    return false;
+  }
+
+  const outerRing = normalizeRingCoordinates(coordinates[0]);
+
+  if (!isPointInRing(point, outerRing)) {
+    return false;
+  }
+
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const holeRing = normalizeRingCoordinates(coordinates[index]);
+
+    if (isPointInRing(point, holeRing)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function getVenueSearchOrigin(venue: any): SearchOrigin | undefined {
   const geometry = venue?.geometry;
 
@@ -126,6 +224,33 @@ export function readLocation(location: unknown): SearchOrigin | undefined {
     lon: rawLng,
     lat: rawLat
   };
+}
+
+export function isLocationWithinVenueGeometry(
+  venue: any,
+  location: SearchOrigin
+): boolean {
+  const geometry = venue?.geometry;
+
+  if (!geometry) {
+    return false;
+  }
+
+  if (geometry.type === "Polygon" || geometry.type === "polygon") {
+    return isPointInPolygonCoordinates(location, geometry.coordinates);
+  }
+
+  if (geometry.type === "MultiPolygon" || geometry.type === "multipolygon") {
+    if (!Array.isArray(geometry.coordinates)) {
+      return false;
+    }
+
+    return geometry.coordinates.some((polygonCoordinates: unknown) =>
+      isPointInPolygonCoordinates(location, polygonCoordinates)
+    );
+  }
+
+  return false;
 }
 
 function toRadians(value: number): number {

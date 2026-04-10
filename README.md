@@ -1,139 +1,252 @@
-# WME Place Harmonizer ROW Edition
 
-WME Place Harmonizer ROW Edition is a Tampermonkey userscript for Waze Map Editor (WME). It helps editors review places against shared standards, see what looks wrong, and apply selected fixes manually.
+# 🗺️ WME Place Harmonizer ROW Edition
 
-## For Users
+**TypeScript userscript for Waze Map Editor ROW Edition place harmonization**
 
-This script adds harmonization checks to WME for the ROW environment. It is designed to support place maintenance without making automatic edits on the editor's behalf.
+An intelligent assistant that automatically checks place information against community-defined standards and suggests improvements – completely under your control.
 
-In the current implementation, the script:
+---
 
-- analyzes the selected venue in WME
-- matches venues against configured chains and category standards
-- shows issues and proposals in the feature editor and the script sidebar
-- scans visible venues on the map and highlights them by status
-- lets the editor apply supported proposals selectively
+## 📋 Table of Contents
 
-The script is data-driven. It reads manifests, config, chains, locales, and reference data from the companion repository:
+- [What does this script do?](#what-does-this-script-do)
+- [Installation](#installation)
+- [How to use](#how-to-use)
+- [Validations & checks](#validations--checks)
+- [Settings](#settings)
+- [Whitelist: Managing exclusions](#whitelist-managing-exclusions)
+- [Report errors & problems](#report-errors--problems)
+- [FAQ](#faq)
 
-- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
+---
 
-The data repository also publishes exception datasets, but the current userscript runtime does not consume them yet.
+## 🎯 What does this script do?
 
-This script is intended for Waze editors and maintainers who want help reviewing place data against shared standards before making manual edits.
+WME Place Harmonizer is a **Tampermonkey script** that helps you maintain place information. It:
 
-## Main Features
+### 🔍 Analyzes places automatically
+When you select a place in WME, the script checks it against:
+- **Community standards** – Guidelines your Waze community defines
+- **Global Waze guidelines** – International best practices
+- **Google Maps data** – External validation (configurable per community)
 
-- venue analysis for the current selection
-- chain matching
-- category-based policy checks
-- phone and URL formatting validation where configured
-- visible-venue scan and highlight output
-- local whitelist support for suppressing specific issues
+### 💡 Suggests improvements
+For each issue found, it shows:
+- What's wrong
+- What the recommended value should be
+- Why it matters
 
-## Installation and Usage
+### ✅ Keeps you in control
+- The script **never makes changes** to WME automatically
+- You decide which suggestions to accept
+- You apply everything manually in WME
+- You can whitelist specific issues to ignore them
 
-You need:
+### 🌍 Community-powered
+Each community manages their own configuration:
+- Define validation rules
+- Enable/disable specific checks (including Google Maps validation)
+- Set category standards
+- Editors automatically get the local community's guidelines
 
-- access to Waze Map Editor
-- Tampermonkey in your browser
-- a built `.user.js` file from this repository or a published release artifact
+### 🌐 Multilingual
+Supports English, Dutch, French (additional languages can be added)
 
-Install the script:
+---
 
-1. Obtain a built userscript file.
-   - `dist/wme-place-harmonizer-row-edition.user.js` for the production build
-   - `dist/wme-place-harmonizer-row-edition.beta.user.js` for the beta build
-   - `dist/wme-place-harmonizer-row-edition.dev.user.js` for the development build
-2. Open the file in Tampermonkey.
-3. Install or update the script.
-4. Open WME and wait for the userscript to initialize.
+## 💻 Installation
 
-Use the script:
+### ✅ Requirements
 
-1. Select a place in WME.
-2. Review the analysis shown in the feature editor and sidebar.
-3. Inspect the reported issues and proposed values.
-4. Select only the changes you want.
-5. Apply the selected fixes.
+- **Tampermonkey** extension: [Chrome](https://www.tampermonkey.net/) | [Firefox](https://addons.mozilla.org/firefox/addon/tampermonkey/) | [Safari](https://apps.apple.com/us/app/tampermonkey/id1482490089)
 
-The script also supports scanning visible venues and highlighting them by severity.
+### 📥 Installation via GreasyFork (recommended)
 
-## Notes
+1. Go to [WME Place Harmonizer on GreasyFork](https://greasyfork.org/scripts/GigaaG/wme-place-harmonizer-row-edition)
+2. Click **"Install this script"**
+3. Done! Tampermonkey handles the rest
 
-- The script does not make automatic edits.
-- Only supported proposal types can be applied from the UI.
-- Some edits still require manual work in WME.
-- Country-specific config and chain overlays are optional; when they fail to load, the runtime falls back to global data and logs the reason.
-- The UI locale follows the WME SDK locale first, then the data-side default locale, then English.
+> [!INFO]  
+> **Want to test beta features?** [Send me a message](https://github.com/GigaaG) for beta channel access.
 
-## Stable, Beta, and Development Channels
+---
 
-Production builds read data from the data repository `main` branch and default to `manifest/stable.json`. Beta builds read data from the data repository `beta` branch and default to `manifest/dev.json`. Development builds read data from the data repository `dev` branch and default to `manifest/dev.json`. Changing the runtime data channel switches between the stable and dev manifests inside the active branch; it does not switch branches at runtime.
+## 🚀 How to use
 
-## For Developers
+### 🔦 Scan visible places
+This is normally done automatically, but just to be sure. 
 
-Prerequisites:
+1. Open the Script Sidebar
+2. Click **"Scan visible venues"**
+3. Places are highlighted:
+   - 🟢 Green – No issues
+   - 🟡 Yellow – Minor issues
+   - 🔴 Red – Significant issues
 
-- Node.js
-- npm
-- Tampermonkey
-- access to WME for runtime testing
+### 📍 Analyze a place
 
-Install dependencies:
+1. **Select a place** in WME
+2. **View findings** in the feature editor panel (right side)
+3. **Review suggestions** – see what's wrong and what's recommended
+4. **Select fixes** – choose which changes to apply
+5. **Apply** – click "Apply" to insert suggestions into the WME form
+6. **Save in WME** – review and save normally in WME
 
-```bash
-npm install
-```
+---
 
-Common commands:
+## ✨ Validations & checks
 
-```bash
-npm run dev
-npm run build:dev
-npm run build:beta
-npm run build:prod
-npm run lint
-npm run check
-npm run test
-```
+The script performs validations based on your community's configuration. Available checks include:
 
-Build outputs:
+### 📋 **Address**
+- Is address required?
+- Is address present and correctly formatted?
 
-- `npm run build:dev` writes `dist/wme-place-harmonizer-row-edition.dev.user.js`
-- `npm run build:beta` writes `dist/wme-place-harmonizer-row-edition.beta.user.js`
-- `npm run build:prod` writes `dist/wme-place-harmonizer-row-edition.user.js`
+### 📱 **Contact information**
+- Phone formatting (country-specific rules)
+- URL format validation
+- Are contact details required?
 
-`npm run build:beta` and `npm run build:prod` stamp beta and stable artifacts from the current development build output, so run `npm run build:dev` first.
+### 📝 **Place details**
+- Editor notes (when required)
+- Description quality
 
-Development builds use `WMEPH-ROW:dev:*` storage keys. Beta builds use `WMEPH-ROW:beta:*` storage keys. Production builds use `WMEPH-ROW:*`.
+### 🏢 **Place information**
+- Place name (unwanted cities, format issues)
+- Brand/name consistency with standards
+- Category compliance
 
-Beta builds publish beta-specific userscript metadata so testers can install once and auto-update from the `beta-dist` artifact branch. Pull requests are verified before merge. After merge, pushes to `beta` republish the verified beta userscript to `beta-dist`, and pushes to `main` republish the verified stable userscript to `stable-dist` so Greasy Fork can sync from a fixed stable artifact URL. Source branches stay free of committed generated userscript files, which keeps `dev -> beta -> main` merges clean.
+### 🌐 **Google Maps validation** ⭐
 
-This repository is the code side of a two-repository system. Runtime behavior depends on data published from:
+Compare your place against Google Maps data:
+- **Place found** – Exists on Google Maps?
+- **Closed status** – Still open?
+- **Location** – How far from Google's location?
+- **Name** – Does it match?
+- **Category** – Matching types?
+- **Opening hours** – Match with Google?
 
-- [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data)
+> [!NOTE]  
+> Communities control Google validation: enable/disable globally or per-check.
 
-When behavior, contracts, or user-facing text change here, check whether the data repository also needs updates. That commonly includes locale files, locale templates, manifests, config, chains, and locale-keyed `editorNotes`.
+### 🔗 **Business chains** (in beta development)
+- Chain recognition and matching
+- Chain-specific policy validation
+- ⚠️ Status: No chains added yet; coming in future releases
 
-Recommended local workflow:
+### ⚙️ **Category standards**
+Community-defined rules for each category:
+- Required fields
+- Recommended fields
+- Forbidden fields
+- Specific policies
 
-1. Install dependencies with `npm install`.
-2. Build a development userscript with `npm run build:dev` or `npm run dev`.
-3. Load the generated userscript into Tampermonkey.
-4. Test the script in WME.
-5. Run `npm run check` before opening a pull request.
-6. Bump `package.json` to the version you plan to release before starting a beta cycle.
-7. Merge `dev` into `beta` when you want a beta release. CI will verify the branch and republish the beta userscript that Tampermonkey tracks to `beta-dist`. Locally, run `npm run build:dev` and `npm run build:beta` if you want to inspect the beta file before or after that push.
-8. After beta approval, merge `beta` into `main`, run `npm run build:dev` and `npm run build:prod`, and let Greasy Fork sync the stable artifact from `stable-dist`.
+---
 
-Further documentation:
+## ⚙️ Settings
 
-- [docs/architecture.md](docs/architecture.md)
-- [docs/build-and-release.md](docs/build-and-release.md)
-- [docs/release-checklist.md](docs/release-checklist.md)
-- [docs/whitelist-model.md](docs/whitelist-model.md)
+Access settings via the **Script Sidebar**.
 
-## License
+### 📊 **Scan settings**
+- **Auto scan** – Enable/disable automatic scanning when panning/zooming
+- **One-time scan** – Manually scan visible places (when auto scan is off)
+- **Natural areas** – Include or exclude forests, water, etc.
 
-[GNU GPL v3](LICENSE)
+### 🔍 **Google Maps validation**
+- **Enable/disable** – Toggle globally
+- **Per-check controls** – Enable/disable individual checks:
+  - Place found, Closed, Location drift, Name match, Category, Opening hours
+
+### 🔄 **Data management**
+- **Reload data** – Fetch latest config and validation data from your community
+
+---
+
+## 📌 Whitelist: Managing exclusions
+
+Ignore specific issues for specific places – useful for known exceptions.
+
+### 🚫 Whitelist an issue
+
+1. Select a place in WME
+2. Click **"Whitelist this issue"** for the issue you want to ignore
+3. Optionally add a note explaining why
+
+### 🔍 Manage your whitelist
+
+1. Open **Settings** in Script Sidebar
+2. Go to **Whitelist management**
+3. View and remove whitelisted issues
+
+**Note:** Whitelist is stored locally in your browser (not shared with Waze). It's lost if you clear your browser cache.
+
+---
+
+## 🐛 Report errors & problems
+
+### 🐞 Bug in the script
+
+[Open an issue](https://github.com/GigaaG/wme-place-harmonizer-row-edition/issues):
+1. Click **"New Issue"**
+2. Describe: what happened, what you expected, how to reproduce
+3. Include: browser version, script version, and console errors (F12 → Console, look for `WMEPH` messages)
+
+### 📊 Error in validation data or translation
+
+[Open an issue on the Data Repository](https://github.com/GigaaG/wme-place-harmonizer-row-data/issues):
+- Incorrect translations
+- Wrong validation guidelines
+- Misconfigured business chains
+- Any data-related issues
+
+### 💬 Questions or ideas
+
+Coming soon™ 
+~GitHub Discussions~
+
+---
+
+## ❓ FAQ
+
+### 📊 Where do standards come from?
+Data comes from [wme-place-harmonizer-row-data](https://github.com/GigaaG/wme-place-harmonizer-row-data) and includes:
+- Community-specific configurations
+- Category guidelines
+- Format standards
+- Business chains (in development)
+- Translations
+
+All publicly viewable – you can see exactly what your community defines.
+
+### 🌍 How does community configuration work?
+Each community can:
+- Define their own validation rules
+- Enable/disable specific checks (including Google Maps checks)
+- Configure category standards
+- Establish regional guidelines
+
+You automatically get your community's guidelines.
+
+### 🌐 Language support
+**Supported:** English, Dutch, French  
+**Add more:** [Get involved](https://github.com/GigaaG/wme-place-harmonizer-row-data/discussions) in translations!
+
+### 🆙 How do I get updates?
+Tampermonkey checks automatically. Updates also appear on GreasyFork. Join beta testing for early access.
+
+### 🔄 Data seems outdated
+Open Script Sidebar → Settings → **"Reload data"**
+
+### ⛓️ Why no business chains yet?
+Chains are in beta development. Coming in future releases. [Follow progress](https://github.com/GigaaG/wme-place-harmonizer-row-edition).
+
+---
+
+## 📚 More information
+
+- 🔗 [GitHub Repository](https://github.com/GigaaG/wme-place-harmonizer-row-edition) – Source code & releases
+- 📦 [Data Repository](https://github.com/GigaaG/wme-place-harmonizer-row-data) – Community configs, guidelines, translations
+
+---
+
+**Questions, bugs, or suggestions? [Open a GitHub issue or discussion!](https://github.com/GigaaG/wme-place-harmonizer-row-edition)**

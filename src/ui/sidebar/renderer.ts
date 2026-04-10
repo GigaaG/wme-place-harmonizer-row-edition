@@ -12,6 +12,15 @@ function escapeHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
+function buildDebugInfoLines(state: SidebarDebugState): string[] {
+  return [
+    `${t("sidebar.channel")}: ${state.dataChannel}`,
+    `${t("sidebar.manifest")}: ${state.manifestVersion} / ${state.manifestRevision}`,
+    `${t("sidebar.runtimeConfig")}: ${state.runtimeConfigId} v${state.runtimeConfigVersion}`,
+    `${t("sidebar.chains")}: ${state.runtimeChainsId} (${state.runtimeChainsCount})`
+  ];
+}
+
 export async function renderSidebarDebugPanel(
   state: SidebarDebugState
 ): Promise<void> {
@@ -22,40 +31,26 @@ export async function renderSidebarDebugPanel(
   }
 
   let html = "";
+  const debugInfoLines = buildDebugInfoLines(state);
+  const debugInfoTooltip = escapeHtml(debugInfoLines.join("\n")).replace(
+    /\r?\n/g,
+    "&#10;"
+  );
+  const debugInfoAriaLabel = escapeHtml(debugInfoLines.join(". "));
 
   html += `
     <div style="padding:10px;font-size:13px;line-height:1.4;">
-      <div style="font-weight:600; margin-bottom:8px;">
-        ${escapeHtml(t("app.name"))}
-      </div>
-  `;
-
-  html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.channel"))}</b><br>
-        ${escapeHtml(state.dataChannel)}
-      </div>
-  `;
-
-  html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.manifest"))}</b><br>
-        ${escapeHtml(state.manifestVersion)}<br>
-        <span style="font-size:12px;color:#666;">${escapeHtml(state.manifestRevision)}</span>
-      </div>
-  `;
-
-  html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.runtimeConfig"))}</b><br>
-        ${escapeHtml(state.runtimeConfigId)} v${escapeHtml(state.runtimeConfigVersion)}
-      </div>
-  `;
-
-  html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.chains"))}</b><br>
-        ${escapeHtml(state.runtimeChainsId)} (${escapeHtml(state.runtimeChainsCount)})
+      <div style="display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:8px;">
+        <span>${escapeHtml(t("app.name"))}</span>
+        <span
+          id="wmeph-row-debug-info"
+          tabindex="0"
+          title="${debugInfoTooltip}"
+          aria-label="${debugInfoAriaLabel}"
+          style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #5b7083;border-radius:999px;font-size:11px;font-weight:700;color:#3c4a57;cursor:help;"
+        >
+          i
+        </span>
       </div>
   `;
 
@@ -82,6 +77,14 @@ export async function renderSidebarDebugPanel(
     <div style="margin-bottom:8px;">
       <b>${escapeHtml(t("sidebar.highlights"))}</b><br>
       ${escapeHtml(state.highlightsEnabled ? t("common.enabled") : t("common.disabled"))}
+      <label style="font-size:12px;display:block;margin-top:4px;">
+        <input
+          id="wmeph-row-natural-features-highlight-toggle"
+          type="checkbox"
+          ${state.disableNaturalFeaturesHighlighting ? "checked" : ""}
+        />
+        ${escapeHtml(t("sidebar.highlights.disableNaturalFeatures"))}
+      </label>
     </div>
   `;
 

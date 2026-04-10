@@ -63,6 +63,15 @@ function buildWhitelistKey(params: {
   return `${params.placeId}::${params.ruleId}::${params.field}`;
 }
 
+function buildRuntimeSnapshotKey(params: {
+  configId: string;
+  configVersion: number;
+  chainsId: string;
+  chainsVersion: number;
+}): string {
+  return `${params.configId}::${params.configVersion}::${params.chainsId}::${params.chainsVersion}`;
+}
+
 function isEntryActive(
   entry: WhitelistEntry,
   runtime: WhitelistRuntimeSnapshot
@@ -81,6 +90,67 @@ function getLocalStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+function pruneEntriesByPlaceRuntimeKeys(params: {
+  store: WhitelistStore;
+  runtimeKeysByPlaceId: Map<string, Set<string>>;
+}): { store: WhitelistStore; removedCount: number } {
+  let removedCount = 0;
+  const items = params.store.items.filter((entry) => {
+    const runtimeKeys = params.runtimeKeysByPlaceId.get(entry.placeId);
+
+    if (!runtimeKeys) {
+      return true;
+    }
+
+    if (runtimeKeys.has(buildRuntimeSnapshotKey(entry))) {
+      return true;
+    }
+
+    removedCount += 1;
+    return false;
+  });
+
+  if (removedCount === 0) {
+    return {
+      store: params.store,
+      removedCount
+    };
+  }
+
+  return {
+    store: {
+      version: WHITELIST_STORE_VERSION,
+      items
+    },
+    removedCount
+  };
+}
+
+function buildRuntimeKeysByPlaceId(
+  entries: Array<
+    Pick<
+      WhitelistEntry,
+      "placeId" | "configId" | "configVersion" | "chainsId" | "chainsVersion"
+    >
+  >
+): Map<string, Set<string>> {
+  const runtimeKeysByPlaceId = new Map<string, Set<string>>();
+
+  for (const entry of entries) {
+    const existing = runtimeKeysByPlaceId.get(entry.placeId);
+    const runtimeKey = buildRuntimeSnapshotKey(entry);
+
+    if (existing) {
+      existing.add(runtimeKey);
+      continue;
+    }
+
+    runtimeKeysByPlaceId.set(entry.placeId, new Set([runtimeKey]));
+  }
+
+  return runtimeKeysByPlaceId;
 }
 
 export function loadWhitelistStore(): WhitelistStore {
@@ -162,10 +232,15 @@ export function upsertWhitelistEntries(entries: WhitelistEntry[]): number {
     }
   }
 
-  saveWhitelistStore({
-    version: WHITELIST_STORE_VERSION,
-    items: Array.from(keyedEntries.values())
-  });
+  saveWhitelistStore(
+    pruneEntriesByPlaceRuntimeKeys({
+      store: {
+        version: WHITELIST_STORE_VERSION,
+        items: Array.from(keyedEntries.values())
+      },
+      runtimeKeysByPlaceId: buildRuntimeKeysByPlaceId(entries)
+    }).store
+  );
 
   return changed;
 }
@@ -177,7 +252,28 @@ export function filterWhitelistedAnalysis(params: {
   runtime: WhitelistRuntimeSnapshot;
   store?: WhitelistStore;
 }): WhitelistFilterResult {
-  const store = params.store ?? loadWhitelistStore();
+  let store = params.store ?? loadWhitelistStore();
+
+  if (!params.store) {
+    const prunedStore = pruneEntriesByPlaceRuntimeKeys({
+      store,
+      runtimeKeysByPlaceId: buildRuntimeKeysByPlaceId([
+        {
+          placeId: params.placeId,
+          configId: params.runtime.configId,
+          configVersion: params.runtime.configVersion,
+          chainsId: params.runtime.chainsId,
+          chainsVersion: params.runtime.chainsVersion
+        }
+      ])
+    });
+
+    store = prunedStore.store;
+
+    if (prunedStore.removedCount > 0) {
+      saveWhitelistStore(store);
+    }
+  }
 
   if (store.items.length === 0) {
     return {

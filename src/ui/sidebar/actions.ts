@@ -84,6 +84,25 @@ export function wireSidebarAutoScanToggle(
   };
 }
 
+export function wireSidebarNaturalFeaturesHighlightToggle(
+  currentValue: boolean,
+  changeHandler: (nextValue: boolean) => Promise<void> | void
+): void {
+  const checkbox = document.getElementById(
+    "wmeph-row-natural-features-highlight-toggle"
+  ) as HTMLInputElement | null;
+
+  if (!checkbox) {
+    return;
+  }
+
+  checkbox.checked = currentValue;
+
+  checkbox.onchange = async () => {
+    await changeHandler(checkbox.checked);
+  };
+}
+
 export function wireSidebarGoogleMapsValidationToggle(
   currentValue: boolean,
   changeHandler: (nextValue: boolean) => Promise<void> | void

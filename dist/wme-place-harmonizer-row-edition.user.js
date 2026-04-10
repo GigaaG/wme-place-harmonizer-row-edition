@@ -85,6 +85,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       debugEnabled: false,
       fallbackCountry: void 0,
       autoScanVisibleVenues: true,
+      disableNaturalFeaturesHighlighting: false,
       googleMapsValidation: {
         enabled: true,
         checks: {
@@ -921,9 +922,10 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     subCategoriesByMainCategory
   };
   const snapshot = sdkValues;
+  const SUBCATEGORIES_BY_MAIN_CATEGORY = snapshot.subCategoriesByMainCategory ?? {};
   const PARENT_BY_SUBCATEGORY = /* @__PURE__ */ new Map();
   for (const [mainCategory, subCategories] of Object.entries(
-    snapshot.subCategoriesByMainCategory ?? {}
+    SUBCATEGORIES_BY_MAIN_CATEGORY
   )) {
     for (const subCategory of subCategories) {
       PARENT_BY_SUBCATEGORY.set(subCategory, mainCategory);
@@ -935,6 +937,19 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       return [categoryKey];
     }
     return [parentCategory, categoryKey];
+  }
+  function getCategoryWithDescendants(categoryKey) {
+    const descendants = SUBCATEGORIES_BY_MAIN_CATEGORY[categoryKey] ?? [];
+    const seen = /* @__PURE__ */ new Set();
+    const categories = [];
+    for (const candidate of [categoryKey, ...descendants]) {
+      if (seen.has(candidate)) {
+        continue;
+      }
+      seen.add(candidate);
+      categories.push(candidate);
+    }
+    return categories;
   }
   function resolveCategoryStandards(config, categories) {
     const standards = config.categoryStandards ?? {};
@@ -1960,6 +1975,9 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   }
   function buildPresenceIssue(params) {
     const { field, rulePrefix, requirement, hasValue, currentValue, messages } = params;
+    if (requirement === "optional") {
+      return void 0;
+    }
     const ruleId = `${rulePrefix}.${requirement}`;
     if (requirement === "required" && !hasValue) {
       return {
@@ -2613,6 +2631,37 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       text: "#0b5394"
     };
   }
+  function getInlineActionButtonStyle(color) {
+    return [
+      "background:none",
+      "border:none",
+      "padding:0",
+      "margin:0",
+      `color:${color}`,
+      "font-size:12px",
+      "font-weight:600",
+      "line-height:1.2",
+      "cursor:pointer",
+      "text-decoration:underline",
+      "text-underline-offset:2px",
+      "white-space:nowrap"
+    ].join(";");
+  }
+  function renderIssueCardFooter(content, justifyContent = "flex-end") {
+    return `
+    <div style="
+      margin-top:8px;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:${justifyContent};
+      column-gap:8px;
+      row-gap:4px;
+    ">
+      ${content}
+    </div>
+  `;
+  }
   function escapeHtml$1(value) {
     return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
@@ -2642,7 +2691,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     </a>
   `;
   }
-  function renderProposal(issue, proposal, index) {
+  function renderProposal(issue, proposal, index, renderApplyControl = true) {
     let html = "";
     html += `
     <div style="
@@ -2679,7 +2728,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       </div>
     `;
     }
-    if (proposal.isApplySupported) {
+    if (proposal.isApplySupported && renderApplyControl) {
       html += `
       <label style="display:block;margin-top:6px;">
         <input
@@ -2760,6 +2809,8 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     let html = "";
     const colors = getSeverityColors(group.severity);
     const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
+    const shouldRenderSharedFooterCheckbox = !shouldRenderAsSingleChoiceGroup(group) && group.proposals.length === 1 && group.proposals[0].isApplySupported;
+    const footerCheckboxProposal = shouldRenderSharedFooterCheckbox ? group.proposals[0] : null;
     html += `
     <div style="
       border: 1px solid ${colors.border};
@@ -2785,32 +2836,120 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       html += renderExternalProviderChoiceGroup(group.issues[0], group);
     } else {
       for (let index = 0; index < group.proposals.length; index += 1) {
-        html += renderProposal(group.issues[0], group.proposals[index], index);
+        html += renderProposal(
+          group.issues[0],
+          group.proposals[index],
+          index,
+          !footerCheckboxProposal
+        );
       }
     }
-    if (canWhitelist) {
-      html += `
-      <div style="margin-top:8px;">
+    if (footerCheckboxProposal || canWhitelist) {
+      let footerContent = "";
+      if (footerCheckboxProposal) {
+        footerContent += `
+        <label style="
+          display:flex;
+          align-items:center;
+          gap:4px;
+          font-size:12px;
+          font-weight:600;
+          margin:0;
+          flex:1 1 auto;
+          min-width:0;
+        ">
+          <input
+            type="checkbox"
+            class="wmeph-row-apply-checkbox"
+            data-proposal-id="${escapeHtml$1(footerCheckboxProposal.id ?? "")}"
+          />
+          <span>${escapeHtml$1(t("featureEditor.applyThisFix"))}</span>
+        </label>
+      `;
+      }
+      if (canWhitelist) {
+        footerContent += `
         <button
           type="button"
           class="wmeph-row-whitelist-issue"
           data-group-key="${escapeHtml$1(group.key)}"
+          style="${getInlineActionButtonStyle(colors.text)}"
         >
           ${escapeHtml$1(t("featureEditor.ignoreForThisVenue"))}
         </button>
-      </div>
-    `;
+      `;
+      }
+      html += renderIssueCardFooter(
+        footerContent,
+        footerCheckboxProposal && canWhitelist ? "space-between" : "flex-end"
+      );
     }
     html += `</div>`;
     return html;
   }
-  function renderFeatureEditorAnalysis(placeName, chainId, issues, proposals, statusMessage) {
+  function renderPendingWhitelistAction(action) {
+    let html = "";
+    const colors = getSeverityColors(action.severity);
+    html += `
+    <div style="
+      border: 1px dashed ${colors.border};
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      background: ${colors.background};
+      opacity: 0.92;
+    ">
+  `;
+    html += `
+    <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
+      ${getSeverityIcon(action.severity)} ${escapeHtml$1(getSeverityLabel(action.severity))}: ${escapeHtml$1(action.message)}
+    </div>
+  `;
+    html += `
+    <div style="font-size:12px;color:#666;margin-bottom:4px;">
+      ${escapeHtml$1(t("featureEditor.field"))}: ${escapeHtml$1(action.field)}
+    </div>
+  `;
+    html += renderIssueCardFooter(
+      `
+      <span
+        class="wmeph-row-pending-whitelist-message"
+        data-group-key="${escapeHtml$1(action.groupKey)}"
+        style="font-size:12px; color:${colors.text};"
+      >
+        ${escapeHtml$1(t("featureEditor.ignorePending"))}
+      </span>
+      <button
+        type="button"
+        class="wmeph-row-undo-whitelist"
+        data-group-key="${escapeHtml$1(action.groupKey)}"
+        style="${getInlineActionButtonStyle(colors.text)}"
+      >
+        ${escapeHtml$1(t("featureEditor.undoIgnore"))} (${action.expiresInSeconds}s)
+      </button>
+    `,
+      "space-between"
+    );
+    html += `</div>`;
+    return html;
+  }
+  function renderFeatureEditorAnalysis(placeName, chainId, issues, proposals, statusMessage, pendingWhitelistActions2 = []) {
     const container = ensureFeatureEditorContainer();
     if (!container) {
       return;
     }
     let html = "";
+    const pendingWhitelistActionsByGroupKey = new Map(
+      pendingWhitelistActions2.map((action) => [action.groupKey, action])
+    );
     const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
+    const issueGroupKeys = new Set(issueGroups.map((group) => group.key));
+    const visibleIssueGroups = issueGroups.filter(
+      (group) => !pendingWhitelistActionsByGroupKey.has(group.key)
+    );
+    const displayedFindingCount = issueGroups.length + pendingWhitelistActions2.filter(
+      (action) => !issueGroupKeys.has(action.groupKey)
+    ).length;
     html += `
   <div style="
     display:flex;
@@ -2822,11 +2961,14 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     ${escapeHtml$1(t("featureEditor.title"))}
   </div>
 
-  <div style="
-    overflow-y:auto;
-    max-height:260px;
-    padding-right:4px;
-  ">
+  <div
+    data-wmeph-row-scroll-container="true"
+    style="
+      overflow-y:auto;
+      max-height:260px;
+      padding-right:4px;
+    "
+  >
   `;
     if (statusMessage) {
       let color = "#2e7d32";
@@ -2864,10 +3006,10 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     html += `
     <div style="margin-bottom:8px;">
       <div><b>${escapeHtml$1(t("featureEditor.findings"))}</b></div>
-      <div>${issueGroups.length}</div>
+      <div>${displayedFindingCount}</div>
     </div>
   `;
-    if (issueGroups.length === 0) {
+    if (displayedFindingCount === 0) {
       html += `
       <div style="
         border: 1px solid #ddd;
@@ -2880,11 +3022,26 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       </div>
     `;
     } else {
+      const renderedPendingGroupKeys = /* @__PURE__ */ new Set();
       for (const group of issueGroups) {
+        const pendingWhitelistAction = pendingWhitelistActionsByGroupKey.get(group.key);
+        if (pendingWhitelistAction) {
+          renderedPendingGroupKeys.add(group.key);
+          html += renderPendingWhitelistAction(pendingWhitelistAction);
+          continue;
+        }
         html += renderIssue(group);
       }
+      for (const pendingWhitelistAction of pendingWhitelistActions2) {
+        if (renderedPendingGroupKeys.has(pendingWhitelistAction.groupKey)) {
+          continue;
+        }
+        html += renderPendingWhitelistAction(pendingWhitelistAction);
+      }
     }
-    const hasApplyableProposals = proposals.some((proposal) => proposal.isApplySupported);
+    const hasApplyableProposals = visibleIssueGroups.some(
+      (group) => group.proposals.some((proposal) => proposal.isApplySupported)
+    );
     if (hasApplyableProposals) {
       html += `
       <div style="margin-top:12px;">
@@ -3812,41 +3969,39 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   function escapeHtml(value) {
     return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+  function buildDebugInfoLines(state) {
+    return [
+      `${t("sidebar.channel")}: ${state.dataChannel}`,
+      `${t("sidebar.manifest")}: ${state.manifestVersion} / ${state.manifestRevision}`,
+      `${t("sidebar.runtimeConfig")}: ${state.runtimeConfigId} v${state.runtimeConfigVersion}`,
+      `${t("sidebar.chains")}: ${state.runtimeChainsId} (${state.runtimeChainsCount})`
+    ];
+  }
   async function renderSidebarDebugPanel(state) {
     const panel = await ensureScriptSidebarTab();
     if (!panel) {
       return;
     }
     let html = "";
+    const debugInfoLines = buildDebugInfoLines(state);
+    const debugInfoTooltip = escapeHtml(debugInfoLines.join("\n")).replace(
+      /\r?\n/g,
+      "&#10;"
+    );
+    const debugInfoAriaLabel = escapeHtml(debugInfoLines.join(". "));
     html += `
     <div style="padding:10px;font-size:13px;line-height:1.4;">
-      <div style="font-weight:600; margin-bottom:8px;">
-        ${escapeHtml(t("app.name"))}
-      </div>
-  `;
-    html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.channel"))}</b><br>
-        ${escapeHtml(state.dataChannel)}
-      </div>
-  `;
-    html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.manifest"))}</b><br>
-        ${escapeHtml(state.manifestVersion)}<br>
-        <span style="font-size:12px;color:#666;">${escapeHtml(state.manifestRevision)}</span>
-      </div>
-  `;
-    html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.runtimeConfig"))}</b><br>
-        ${escapeHtml(state.runtimeConfigId)} v${escapeHtml(state.runtimeConfigVersion)}
-      </div>
-  `;
-    html += `
-      <div style="margin-bottom:8px;">
-        <b>${escapeHtml(t("sidebar.chains"))}</b><br>
-        ${escapeHtml(state.runtimeChainsId)} (${escapeHtml(state.runtimeChainsCount)})
+      <div style="display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:8px;">
+        <span>${escapeHtml(t("app.name"))}</span>
+        <span
+          id="wmeph-row-debug-info"
+          tabindex="0"
+          title="${debugInfoTooltip}"
+          aria-label="${debugInfoAriaLabel}"
+          style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #5b7083;border-radius:999px;font-size:11px;font-weight:700;color:#3c4a57;cursor:help;"
+        >
+          i
+        </span>
       </div>
   `;
     html += `
@@ -3870,6 +4025,14 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     <div style="margin-bottom:8px;">
       <b>${escapeHtml(t("sidebar.highlights"))}</b><br>
       ${escapeHtml(state.highlightsEnabled ? t("common.enabled") : t("common.disabled"))}
+      <label style="font-size:12px;display:block;margin-top:4px;">
+        <input
+          id="wmeph-row-natural-features-highlight-toggle"
+          type="checkbox"
+          ${state.disableNaturalFeaturesHighlighting ? "checked" : ""}
+        />
+        ${escapeHtml(t("sidebar.highlights.disableNaturalFeatures"))}
+      </label>
     </div>
   `;
     html += `
@@ -3988,6 +4151,18 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   function wireSidebarAutoScanToggle(currentValue, changeHandler) {
     const checkbox = document.getElementById(
       "wmeph-row-auto-scan-toggle"
+    );
+    if (!checkbox) {
+      return;
+    }
+    checkbox.checked = currentValue;
+    checkbox.onchange = async () => {
+      await changeHandler(checkbox.checked);
+    };
+  }
+  function wireSidebarNaturalFeaturesHighlightToggle(currentValue, changeHandler) {
+    const checkbox = document.getElementById(
+      "wmeph-row-natural-features-highlight-toggle"
     );
     if (!checkbox) {
       return;
@@ -5524,6 +5699,9 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   function buildWhitelistKey(params) {
     return `${params.placeId}::${params.ruleId}::${params.field}`;
   }
+  function buildRuntimeSnapshotKey(params) {
+    return `${params.configId}::${params.configVersion}::${params.chainsId}::${params.chainsVersion}`;
+  }
   function isEntryActive(entry, runtime) {
     return entry.configId === runtime.configId && entry.configVersion === runtime.configVersion && entry.chainsId === runtime.chainsId && entry.chainsVersion === runtime.chainsVersion;
   }
@@ -5533,6 +5711,46 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     } catch {
       return null;
     }
+  }
+  function pruneEntriesByPlaceRuntimeKeys(params) {
+    let removedCount = 0;
+    const items = params.store.items.filter((entry) => {
+      const runtimeKeys = params.runtimeKeysByPlaceId.get(entry.placeId);
+      if (!runtimeKeys) {
+        return true;
+      }
+      if (runtimeKeys.has(buildRuntimeSnapshotKey(entry))) {
+        return true;
+      }
+      removedCount += 1;
+      return false;
+    });
+    if (removedCount === 0) {
+      return {
+        store: params.store,
+        removedCount
+      };
+    }
+    return {
+      store: {
+        version: WHITELIST_STORE_VERSION,
+        items
+      },
+      removedCount
+    };
+  }
+  function buildRuntimeKeysByPlaceId(entries) {
+    const runtimeKeysByPlaceId = /* @__PURE__ */ new Map();
+    for (const entry of entries) {
+      const existing = runtimeKeysByPlaceId.get(entry.placeId);
+      const runtimeKey = buildRuntimeSnapshotKey(entry);
+      if (existing) {
+        existing.add(runtimeKey);
+        continue;
+      }
+      runtimeKeysByPlaceId.set(entry.placeId, /* @__PURE__ */ new Set([runtimeKey]));
+    }
+    return runtimeKeysByPlaceId;
   }
   function loadWhitelistStore() {
     const storage = getLocalStorage();
@@ -5591,14 +5809,37 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
         changed += 1;
       }
     }
-    saveWhitelistStore({
-      version: WHITELIST_STORE_VERSION,
-      items: Array.from(keyedEntries.values())
-    });
+    saveWhitelistStore(
+      pruneEntriesByPlaceRuntimeKeys({
+        store: {
+          version: WHITELIST_STORE_VERSION,
+          items: Array.from(keyedEntries.values())
+        },
+        runtimeKeysByPlaceId: buildRuntimeKeysByPlaceId(entries)
+      }).store
+    );
     return changed;
   }
   function filterWhitelistedAnalysis(params) {
-    const store = params.store ?? loadWhitelistStore();
+    let store = params.store ?? loadWhitelistStore();
+    if (!params.store) {
+      const prunedStore = pruneEntriesByPlaceRuntimeKeys({
+        store,
+        runtimeKeysByPlaceId: buildRuntimeKeysByPlaceId([
+          {
+            placeId: params.placeId,
+            configId: params.runtime.configId,
+            configVersion: params.runtime.configVersion,
+            chainsId: params.runtime.chainsId,
+            chainsVersion: params.runtime.chainsVersion
+          }
+        ])
+      });
+      store = prunedStore.store;
+      if (prunedStore.removedCount > 0) {
+        saveWhitelistStore(store);
+      }
+    }
     if (store.items.length === 0) {
       return {
         issues: params.issues,
@@ -5727,6 +5968,18 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       error,
       results
     };
+  }
+  const NATURAL_FEATURE_HIGHLIGHT_CATEGORY_KEYS = new Set(
+    getCategoryWithDescendants("NATURAL_FEATURES")
+  );
+  function shouldSkipVenueHighlight(venue, disableNaturalFeaturesHighlighting) {
+    if (!disableNaturalFeaturesHighlighting) {
+      return false;
+    }
+    const categories = normalizeCategoryKeys(venue?.categories ?? []);
+    return categories.some(
+      (categoryKey) => NATURAL_FEATURE_HIGHLIGHT_CATEGORY_KEYS.has(categoryKey)
+    );
   }
   const HIGHLIGHT_LAYER_NAME = "wmeph-row-visible-venues";
   const MIN_POINT_HIGHLIGHT_ZOOM = 17;
@@ -6026,9 +6279,17 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     const polygonOutlineFeatures = [];
     const pointFeatures = [];
     const nextFeatureIds = [];
+    let suppressedBySettingsCount = 0;
     for (const result of summary.results) {
       const venue = venueMap.get(String(result.venueId));
       if (!venue) {
+        continue;
+      }
+      if (shouldSkipVenueHighlight(
+        venue,
+        options.disableNaturalFeaturesHighlighting === true
+      )) {
+        suppressedBySettingsCount += 1;
         continue;
       }
       const venueFeatures = buildSdkFeatures(venue, result, allowPointHighlights);
@@ -6056,7 +6317,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       ...pointFeatures
     ];
     if (features.length === 0) {
-      if (options.keepExistingOnEmpty && allowPointHighlights && highlightedFeatureIds.length > 0) {
+      if (options.keepExistingOnEmpty && allowPointHighlights && highlightedFeatureIds.length > 0 && suppressedBySettingsCount === 0) {
         logger.info("No drawable highlights, keeping existing rendered layer");
         return {
           renderedFeatureCount: 0,
@@ -6180,6 +6441,63 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     listenersRegistered = true;
     logger.info("Venue save scan listener registered");
   }
+  const WHITELIST_UNDO_WINDOW_MS = 5e3;
+  const pendingWhitelistActions = /* @__PURE__ */ new Map();
+  function toPendingWhitelistAction(action) {
+    const { timerId: _timerId, ...pendingAction } = action;
+    return pendingAction;
+  }
+  function buildPendingWhitelistActionKey(params) {
+    return `${params.venueId}::${params.groupKey}`;
+  }
+  function schedulePendingWhitelistAction(params) {
+    const key = buildPendingWhitelistActionKey({
+      venueId: params.venueId,
+      groupKey: params.groupKey
+    });
+    const existing = pendingWhitelistActions.get(key);
+    if (existing) {
+      globalThis.clearTimeout(existing.timerId);
+      pendingWhitelistActions.delete(key);
+    }
+    const expiresAt = Date.now() + WHITELIST_UNDO_WINDOW_MS;
+    const action = {
+      key,
+      venueId: params.venueId,
+      groupKey: params.groupKey,
+      severity: params.severity,
+      message: params.message,
+      field: params.field,
+      entries: [...params.entries],
+      expiresAt,
+      timerId: globalThis.setTimeout(() => {
+        const pendingAction = pendingWhitelistActions.get(key);
+        if (!pendingAction) {
+          return;
+        }
+        pendingWhitelistActions.delete(key);
+        params.onExpire(toPendingWhitelistAction(pendingAction));
+      }, WHITELIST_UNDO_WINDOW_MS)
+    };
+    pendingWhitelistActions.set(key, action);
+    return toPendingWhitelistAction(action);
+  }
+  function cancelPendingWhitelistAction(params) {
+    const key = buildPendingWhitelistActionKey({
+      venueId: params.venueId,
+      groupKey: params.groupKey
+    });
+    const action = pendingWhitelistActions.get(key);
+    if (!action) {
+      return null;
+    }
+    globalThis.clearTimeout(action.timerId);
+    pendingWhitelistActions.delete(key);
+    return toPendingWhitelistAction(action);
+  }
+  function getPendingWhitelistActionsForVenue(venueId) {
+    return Array.from(pendingWhitelistActions.values()).filter((action) => action.venueId === venueId).sort((left, right) => left.expiresAt - right.expiresAt).map((action) => toPendingWhitelistAction(action));
+  }
   function isLocaleFile(value) {
     if (!value || typeof value !== "object") {
       return false;
@@ -6224,6 +6542,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
   let runtimeCountry;
   let externalProviderSuggestionRequestId = 0;
   let externalProviderValidationRequestId = 0;
+  let pendingWhitelistRenderTimer = null;
   function resolvePreferredCountry(params) {
     const candidates = [
       params.primaryCountry,
@@ -6451,20 +6770,97 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       runtime: whitelistRuntime
     });
   }
+  function getPendingWhitelistRenderActions(venueId) {
+    const now = Date.now();
+    return getPendingWhitelistActionsForVenue(venueId).map((action) => ({
+      groupKey: action.groupKey,
+      field: action.field,
+      severity: action.severity,
+      message: action.message,
+      expiresInSeconds: Math.max(
+        1,
+        Math.ceil((action.expiresAt - now) / 1e3)
+      )
+    }));
+  }
+  function getFeatureEditorScrollContainer() {
+    return document.querySelector(
+      '#wmeph-row-feature-editor [data-wmeph-row-scroll-container="true"]'
+    );
+  }
+  function cancelPendingWhitelistRenderTimer() {
+    if (pendingWhitelistRenderTimer !== null) {
+      globalThis.clearTimeout(pendingWhitelistRenderTimer);
+      pendingWhitelistRenderTimer = null;
+    }
+  }
+  function refreshPendingWhitelistCountdowns(venueId) {
+    const pendingWhitelistActions2 = getPendingWhitelistRenderActions(venueId);
+    if (pendingWhitelistActions2.length === 0) {
+      cancelPendingWhitelistRenderTimer();
+      return;
+    }
+    for (const action of pendingWhitelistActions2) {
+      const message = document.querySelector(
+        `.wmeph-row-pending-whitelist-message[data-group-key="${CSS.escape(action.groupKey)}"]`
+      );
+      if (message) {
+        message.textContent = t("featureEditor.ignorePending");
+      }
+      const button = document.querySelector(
+        `.wmeph-row-undo-whitelist[data-group-key="${CSS.escape(action.groupKey)}"]`
+      );
+      if (button) {
+        button.textContent = `${t("featureEditor.undoIgnore")} (${action.expiresInSeconds}s)`;
+      }
+    }
+  }
+  function schedulePendingWhitelistRenderTick(venueId) {
+    cancelPendingWhitelistRenderTimer();
+    if (!document.getElementById("wmeph-row-feature-editor")) {
+      return;
+    }
+    if (getPendingWhitelistActionsForVenue(venueId).length === 0) {
+      return;
+    }
+    pendingWhitelistRenderTimer = globalThis.setTimeout(() => {
+      pendingWhitelistRenderTimer = null;
+      const latest = getLatestAnalysisState();
+      if (!latest?.isVenueSelection || latest.venueId !== venueId) {
+        return;
+      }
+      refreshPendingWhitelistCountdowns(venueId);
+      schedulePendingWhitelistRenderTick(venueId);
+    }, 1e3);
+  }
   function renderLatestVenueAnalysis() {
     const latest = getLatestAnalysisState();
     if (!latest?.isVenueSelection) {
+      cancelPendingWhitelistRenderTimer();
       return;
     }
+    const pendingWhitelistActions2 = getPendingWhitelistRenderActions(latest.venueId);
+    const previousScrollTop = getFeatureEditorScrollContainer()?.scrollTop ?? null;
     renderFeatureEditorAnalysis(
       latest.placeName,
       latest.chainId,
       latest.issues,
       latest.proposals,
-      latest.statusMessage
+      latest.statusMessage,
+      pendingWhitelistActions2
     );
+    const scrollContainer = getFeatureEditorScrollContainer();
+    if (previousScrollTop !== null && scrollContainer) {
+      scrollContainer.scrollTop = previousScrollTop;
+    }
     wireApplyButton();
     wireWhitelistButtons();
+    wireUndoWhitelistButtons();
+    if (pendingWhitelistActions2.length > 0) {
+      schedulePendingWhitelistRenderTick(latest.venueId);
+    } else {
+      cancelPendingWhitelistRenderTimer();
+    }
   }
   async function refreshRuntimeLocale() {
     if (!runtimeManifest || !runtimeConfig) {
@@ -6649,6 +7045,31 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       await rerenderSidebar();
     }
   }
+  async function setDisableNaturalFeaturesHighlighting(enabled) {
+    if (!runtimeSettings) {
+      logger.warn(
+        "Cannot update NATURAL_FEATURES highlight setting: runtime settings unavailable"
+      );
+      return;
+    }
+    runtimeSettings = {
+      ...runtimeSettings,
+      disableNaturalFeaturesHighlighting: enabled
+    };
+    settingsManager.save(runtimeSettings);
+    const statusText = enabled ? t("status.naturalFeaturesHighlighting.disabled") : t("status.naturalFeaturesHighlighting.enabled");
+    const sidebarState = getSidebarDebugState();
+    if (sidebarState) {
+      setSidebarDebugState({
+        ...sidebarState,
+        ...buildGoogleMapsValidationSidebarState(),
+        disableNaturalFeaturesHighlighting: enabled,
+        lastStatus: statusText
+      });
+      await rerenderSidebar();
+    }
+    await scanVisibleVenuesFromMap("manual", statusText);
+  }
   function hasEnabledGoogleMapsValidationChecks() {
     const checks = getEffectiveRuntimeGoogleMapsValidationSettings()?.checks;
     if (!checks) {
@@ -6762,6 +7183,10 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       !!state.autoScanVisibleVenues,
       setAutoScanVisibleVenues
     );
+    wireSidebarNaturalFeaturesHighlightToggle(
+      !!state.disableNaturalFeaturesHighlighting,
+      setDisableNaturalFeaturesHighlighting
+    );
     wireSidebarGoogleMapsValidationToggle(
       state.googleMapsValidation?.enabled ?? true,
       setGoogleMapsValidationEnabled
@@ -6771,7 +7196,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       setGoogleMapsValidationCheck
     );
   }
-  async function scanVisibleVenuesFromMap(trigger = "manual") {
+  async function scanVisibleVenuesFromMap(trigger = "manual", statusOverride) {
     if (!runtimeConfig || !runtimeChains) {
       logger.warn("Cannot scan visible venues: runtime not initialized");
       return;
@@ -6811,9 +7236,10 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       whitelistRuntime: getCurrentWhitelistRuntimeSnapshot() ?? void 0
     });
     const highlightRenderResult = renderHighlights(summary, venues, {
-      keepExistingOnEmpty: trigger === "auto"
+      keepExistingOnEmpty: trigger === "auto",
+      disableNaturalFeaturesHighlighting: runtimeSettings?.disableNaturalFeaturesHighlighting === true
     });
-    let statusText = t("status.scannedVisibleVenues", {
+    let statusText = statusOverride ?? t("status.scannedVisibleVenues", {
       count: summary.total
     });
     if (highlightRenderResult.keptExisting) {
@@ -6998,6 +7424,30 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
     }
     return Array.from(entries.values());
   }
+  async function finalizePendingWhitelistAction(action) {
+    const changedCount = upsertWhitelistEntries(action.entries);
+    const latest = getLatestAnalysisState();
+    if (latest?.isVenueSelection && latest.venueId === action.venueId) {
+      const filteredAnalysis = applyWhitelistToAnalysis({
+        venueId: latest.venueId,
+        issues: latest.issues,
+        proposals: latest.proposals
+      });
+      setLatestAnalysisState({
+        ...latest,
+        issues: filteredAnalysis.issues,
+        proposals: filteredAnalysis.proposals,
+        statusMessage: {
+          kind: "success",
+          text: changedCount > 0 ? t("status.whitelist.ignored", {
+            count: action.entries.length
+          }) : t("status.whitelist.alreadyIgnored")
+        }
+      });
+      renderLatestVenueAnalysis();
+    }
+    await scanVisibleVenuesFromMap("manual");
+  }
   function wireWhitelistButtons() {
     const buttons = Array.from(
       document.querySelectorAll(".wmeph-row-whitelist-issue")
@@ -7036,28 +7486,52 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
             logger.warn(`Whitelist group ${groupKey} has no rule-bound issues`);
             return;
           }
-          const changedCount = upsertWhitelistEntries(entries);
-          const filteredAnalysis = applyWhitelistToAnalysis({
+          schedulePendingWhitelistAction({
             venueId: latest.venueId,
-            issues: latest.issues,
-            proposals: latest.proposals
-          });
-          setLatestAnalysisState({
-            ...latest,
-            issues: filteredAnalysis.issues,
-            proposals: filteredAnalysis.proposals,
-            statusMessage: {
-              kind: "success",
-              text: changedCount > 0 ? t("status.whitelist.ignored", {
-                count: entries.length
-              }) : t("status.whitelist.alreadyIgnored")
+            groupKey,
+            severity: group.severity,
+            message: group.message,
+            field: group.field,
+            entries,
+            onExpire: (action) => {
+              void finalizePendingWhitelistAction(action);
             }
           });
           renderLatestVenueAnalysis();
-          await scanVisibleVenuesFromMap("manual");
         } finally {
           button.removeAttribute("disabled");
         }
+      };
+    }
+  }
+  function wireUndoWhitelistButtons() {
+    const buttons = Array.from(
+      document.querySelectorAll(".wmeph-row-undo-whitelist")
+    );
+    if (buttons.length === 0) {
+      return;
+    }
+    for (const button of buttons) {
+      button.onclick = () => {
+        const latest = getLatestAnalysisState();
+        if (!latest?.isVenueSelection) {
+          logger.warn("Undo whitelist clicked, but no venue analysis state is available");
+          return;
+        }
+        const groupKey = button.dataset.groupKey;
+        if (!groupKey) {
+          logger.warn("Undo whitelist clicked without an issue-group key");
+          return;
+        }
+        const canceledAction = cancelPendingWhitelistAction({
+          venueId: latest.venueId,
+          groupKey
+        });
+        if (!canceledAction) {
+          logger.warn(`Pending whitelist group not found: ${groupKey}`);
+          return;
+        }
+        renderLatestVenueAnalysis();
       };
     }
   }
@@ -7245,6 +7719,7 @@ globalThis.__WMEPH_ROW_BUILD_CHANNEL__ = "stable";
       lastStatus: t("status.ready"),
       highlightsEnabled: true,
       autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true,
+      disableNaturalFeaturesHighlighting: runtimeSettings?.disableNaturalFeaturesHighlighting ?? false,
       ...buildGoogleMapsValidationSidebarState()
     });
     const sidebarState = getSidebarDebugState();

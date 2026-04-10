@@ -207,9 +207,7 @@ runTest("emits informational editor notes from matched category standards", () =
 runTest("allows NL train stations to keep the city name in the venue name", () => {
   const rawCategories = ["TRAIN_STATION"];
   const normalizedCategories = normalizeCategoryKeys(rawCategories);
-  const categoryStandards = normalizedCategories
-    .map((category) => nlConfig.categoryStandards?.[category])
-    .filter((standard) => standard !== undefined);
+  const categoryStandards = resolveCategoryStandards(nlConfig, normalizedCategories);
   const place: PlaceLike = {
     name: "Amsterdam Centraal",
     categories: normalizedCategories,
@@ -227,16 +225,14 @@ runTest("allows NL train stations to keep the city name in the venue name", () =
     }
   );
 
-  assert.equal(categoryStandards.length, 1);
+  assert.equal(categoryStandards.length, 2);
   assert.equal(issues.some((issue) => issue.ruleId === "cityInVenueName"), false);
 });
 
 runTest("requires external provider ids for NL restaurants", () => {
   const rawCategories = ["RESTAURANT"];
   const normalizedCategories = normalizeCategoryKeys(rawCategories);
-  const categoryStandards = normalizedCategories
-    .map((category) => nlConfig.categoryStandards?.[category])
-    .filter((standard) => standard !== undefined);
+  const categoryStandards = resolveCategoryStandards(nlConfig, normalizedCategories);
   const place: PlaceLike = {
     name: "Test Restaurant",
     categories: normalizedCategories
@@ -247,7 +243,7 @@ runTest("requires external provider ids for NL restaurants", () => {
     resolveEffectivePolicy({ categoryStandards })
   );
 
-  assert.equal(categoryStandards.length, 1);
+  assert.equal(categoryStandards.length, 2);
   assert.equal(
     issues.some((issue) => issue.ruleId === "externalProvider.required"),
     true
@@ -266,9 +262,9 @@ runTest("leaf subcategories inherit missing fields from their main category", ()
   const issues = evaluatePlace(place, policy);
 
   assert.deepEqual(normalizedCategories, ["JEWELRY"]);
-  assert.equal(policy.openingHours, "recommended");
+  assert.equal(policy.openingHours, "required");
   assert.equal(
-    issues.some((issue) => issue.ruleId === "openingHours.recommended"),
+    issues.some((issue) => issue.ruleId === "openingHours.required"),
     true
   );
 });
@@ -297,42 +293,40 @@ runTest("required child geometry suppresses inherited parent geometry recommenda
   );
 });
 
-runTest("subcategory overrides main category for NL transport external provider rules", () => {
+runTest("subcategory-specific NL transport external provider rules are applied", () => {
   const rawCategories = [
     {
       categoryId: "TRANSPORTATION",
-      subCategoryId: "JUNCTION_INTERCHANGE",
-      localizedName: "Junction / Interchange"
+      subCategoryId: "SUBWAY_STATION",
+      localizedName: "Subway Station"
     }
   ];
   const normalizedCategories = normalizeCategoryKeys(rawCategories);
-  const categoryStandards = normalizedCategories
-    .map((category) => nlConfig.categoryStandards?.[category])
-    .filter((standard) => standard !== undefined);
+  const categoryStandards = resolveCategoryStandards(nlConfig, normalizedCategories);
   const missingIdsPlace: PlaceLike = {
-    name: "Test Interchange",
+    name: "Test Subway Station",
     categories: normalizedCategories
   };
   const presentIdsPlace: PlaceLike = {
-    name: "Test Interchange",
+    name: "Test Subway Station",
     categories: normalizedCategories,
     externalProviderIds: ["demo-id"]
   };
   const policy = resolveEffectivePolicy({ categoryStandards });
 
-  assert.deepEqual(normalizedCategories, ["TRANSPORTATION", "JUNCTION_INTERCHANGE"]);
-  assert.equal(policy.externalProviderIds, "forbidden");
+  assert.deepEqual(normalizedCategories, ["TRANSPORTATION", "SUBWAY_STATION"]);
+  assert.equal(policy.externalProviderIds, "required");
   assert.equal(
     evaluatePlace(missingIdsPlace, policy).some(
       (issue) => issue.ruleId === "externalProvider.required"
     ),
-    false
+    true
   );
   assert.equal(
     evaluatePlace(presentIdsPlace, policy).some(
-      (issue) => issue.ruleId === "externalProvider.forbidden"
+      (issue) => issue.ruleId === "externalProvider.required"
     ),
-    true
+    false
   );
 });
 

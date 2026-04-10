@@ -112,6 +112,29 @@ runTest("renders ignore as a compact inline action", () => {
   assert.equal(html.includes("background:none;border:none;padding:0"), true);
 });
 
+runTest("renders ignore next to the field when no script fix is available", () => {
+  const html = renderAnalysisHtml({
+    issues: [
+      {
+        field: "url",
+        severity: "warning",
+        message: "URL is required",
+        groupKey: "url::required",
+        ruleId: "urlValidation.required"
+      }
+    ],
+    proposals: []
+  });
+
+  assert.equal(html.includes("Field: url"), true);
+  assert.equal(html.includes('class="wmeph-row-whitelist-issue"'), true);
+  assert.match(
+    html,
+    /Field: url<\/span>\s*<button[\s\S]*class="wmeph-row-whitelist-issue"/
+  );
+  assert.equal(html.includes("margin-top:8px;\n      display:flex;"), false);
+});
+
 runTest("does not show unavailable text when a single fix is rendered in the footer", () => {
   const html = renderAnalysisHtml({
     issues: [buildIssue()],

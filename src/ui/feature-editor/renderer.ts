@@ -103,6 +103,47 @@ function renderIssueCardFooter(
   `;
 }
 
+function renderIssueFieldRow(
+  field: string,
+  whitelistGroupKey?: string,
+  whitelistTextColor?: string
+): string {
+  const fieldContent = `
+    <span>${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(field)}</span>
+  `;
+
+  const whitelistButton =
+    whitelistGroupKey && whitelistTextColor
+      ? `
+        <button
+          type="button"
+          class="wmeph-row-whitelist-issue"
+          data-group-key="${escapeHtml(whitelistGroupKey)}"
+          style="${getInlineActionButtonStyle(whitelistTextColor)}"
+        >
+          ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
+        </button>
+      `
+      : "";
+
+  return `
+    <div style="
+      font-size:12px;
+      color:#666;
+      margin-bottom:4px;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      column-gap:8px;
+      row-gap:4px;
+    ">
+      ${fieldContent}
+      ${whitelistButton}
+    </div>
+  `;
+}
+
 function escapeHtml(value: unknown): string {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -155,7 +196,8 @@ function renderProposal(
   issue: PlaceIssue,
   proposal: PlaceProposal,
   index: number,
-  renderApplyControl = true
+  renderApplyControl = true,
+  renderCurrentValue = true
 ): string {
   let html = "";
 
@@ -168,8 +210,9 @@ function renderProposal(
   `;
 
   if (
-    proposal.currentValue !== undefined ||
-    (proposal.displayCurrentValue ?? "").trim().length > 0
+    renderCurrentValue &&
+    (proposal.currentValue !== undefined ||
+      (proposal.displayCurrentValue ?? "").trim().length > 0)
   ) {
     html += `
       <div>
@@ -196,7 +239,7 @@ function renderProposal(
     `;
   }
 
-  if (proposal.reason && proposal.reason !== issue.message) {
+  if (shouldRenderProposalReason(issue, proposal)) {
     html += `
       <div style="color:#666;margin-top:4px;">
         ${escapeHtml(proposal.reason)}
@@ -235,6 +278,21 @@ function renderProposal(
   return html;
 }
 
+function shouldRenderProposalReason(
+  issue: PlaceIssue,
+  proposal: PlaceProposal
+): boolean {
+  if (!proposal.reason || proposal.reason === issue.message) {
+    return false;
+  }
+
+  if (proposal.field === "aliases") {
+    return false;
+  }
+
+  return true;
+}
+
 function isExternalProviderChoiceProposal(proposal: PlaceProposal): boolean {
   return (
     proposal.field === "externalProviderIds" &&
@@ -252,6 +310,12 @@ function shouldRenderAsSingleChoiceGroup(
     group.proposals.filter((proposal) => isExternalProviderChoiceProposal(proposal))
       .length > 1
   );
+}
+
+function shouldRenderSharedCurrentValueGroup(
+  group: FeatureEditorIssueGroup
+): boolean {
+  return group.field === "aliases" && group.proposals.length > 1;
 }
 
 function renderExternalProviderChoiceGroup(
@@ -304,7 +368,7 @@ function renderExternalProviderChoiceGroup(
       </label>
     `;
 
-    if (proposal.reason && proposal.reason !== issue.message) {
+    if (shouldRenderProposalReason(issue, proposal)) {
       html += `
         <div style="font-size:12px;color:#666;margin-top:4px;margin-left:20px;">
           ${escapeHtml(proposal.reason)}
@@ -316,17 +380,62 @@ function renderExternalProviderChoiceGroup(
   return html;
 }
 
+function renderSharedCurrentValueGroup(
+  issue: PlaceIssue,
+  group: FeatureEditorIssueGroup,
+  footerCheckboxProposalId?: string
+): string {
+  let html = "";
+  const currentValue = group.proposals[0];
+
+  if (
+    currentValue &&
+    (currentValue.currentValue !== undefined ||
+      (currentValue.displayCurrentValue ?? "").trim().length > 0)
+  ) {
+    html += `
+      <div style="font-size:12px;margin-top:6px;">
+        <b>${escapeHtml(t("featureEditor.current"))}:</b> ${formatProposalValue(
+          currentValue.currentValue,
+          currentValue.displayCurrentValue
+        )}
+      </div>
+    `;
+  }
+
+  for (let index = 0; index < group.proposals.length; index += 1) {
+    const proposal = group.proposals[index];
+    html += renderProposal(
+      issue,
+      proposal,
+      index,
+      proposal.id !== footerCheckboxProposalId,
+      false
+    );
+  }
+
+  return html;
+}
+
 function renderIssue(group: FeatureEditorIssueGroup): string {
   let html = "";
   const colors = getSeverityColors(group.severity);
   const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
+  const shouldRenderSharedCurrentValue = shouldRenderSharedCurrentValueGroup(group);
+  const sharedCurrentValueFooterCheckboxProposal =
+    shouldRenderSharedCurrentValue &&
+    group.proposals.length > 0 &&
+    group.proposals[group.proposals.length - 1].isApplySupported
+      ? group.proposals[group.proposals.length - 1]
+      : null;
   const shouldRenderSharedFooterCheckbox =
     !shouldRenderAsSingleChoiceGroup(group) &&
+    !shouldRenderSharedCurrentValue &&
     group.proposals.length === 1 &&
     group.proposals[0].isApplySupported;
-  const footerCheckboxProposal = shouldRenderSharedFooterCheckbox
-    ? group.proposals[0]
-    : null;
+  const footerCheckboxProposal =
+    sharedCurrentValueFooterCheckboxProposal ??
+    (shouldRenderSharedFooterCheckbox ? group.proposals[0] : null);
 
   html += `
     <div style="
@@ -345,27 +454,34 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   `;
 
   if (group.field) {
-    html += `
-      <div style="font-size:12px;color:#666;margin-bottom:4px;">
-        ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(group.field)}
-      </div>
-    `;
+    html += renderIssueFieldRow(
+      group.field,
+      canWhitelist && !footerCheckboxProposal ? group.key : undefined,
+      canWhitelist && !footerCheckboxProposal ? colors.text : undefined
+    );
   }
 
   if (shouldRenderAsSingleChoiceGroup(group)) {
     html += renderExternalProviderChoiceGroup(group.issues[0], group);
+  } else if (shouldRenderSharedCurrentValue) {
+    html += renderSharedCurrentValueGroup(
+      group.issues[0],
+      group,
+      footerCheckboxProposal?.id
+    );
   } else {
     for (let index = 0; index < group.proposals.length; index += 1) {
       html += renderProposal(
         group.issues[0],
         group.proposals[index],
         index,
-        !footerCheckboxProposal
+        !footerCheckboxProposal,
+        true
       );
     }
   }
 
-  if (footerCheckboxProposal || canWhitelist) {
+  if (footerCheckboxProposal || (canWhitelist && !group.field)) {
     let footerContent = "";
 
     if (footerCheckboxProposal) {
@@ -390,7 +506,7 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
       `;
     }
 
-    if (canWhitelist) {
+    if (canWhitelist && (footerCheckboxProposal || !group.field)) {
       footerContent += `
         <button
           type="button"
@@ -438,9 +554,7 @@ function renderPendingWhitelistAction(
   `;
 
   html += `
-    <div style="font-size:12px;color:#666;margin-bottom:4px;">
-      ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(action.field)}
-    </div>
+    ${renderIssueFieldRow(action.field)}
   `;
 
   html += renderIssueCardFooter(

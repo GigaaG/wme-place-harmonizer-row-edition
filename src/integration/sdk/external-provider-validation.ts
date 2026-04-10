@@ -11,6 +11,7 @@ import {
   calculateDistanceMeters,
   ensurePlacesServiceContainer,
   getGoogleMapsApi,
+  isLocationWithinVenueGeometry,
   getVenueSearchOrigin,
   isNotFoundPlaceDetailsStatus,
   isOkPlaceDetailsStatus,
@@ -277,8 +278,12 @@ export async function validateLinkedExternalProviders(
 
     if (isOkPlaceDetailsStatus(status, googleMaps)) {
       const placeLocation = readLocation(result?.geometry?.location);
+      const isWithinVenueGeometry =
+        placeLocation && params.venue
+          ? isLocationWithinVenueGeometry(params.venue, placeLocation)
+          : false;
       const distanceMeters =
-        venueOrigin && placeLocation
+        venueOrigin && placeLocation && !isWithinVenueGeometry
           ? calculateDistanceMeters(venueOrigin, placeLocation)
           : undefined;
       const googleOpeningHours = normalizeGoogleOpeningHours(
@@ -295,7 +300,7 @@ export async function validateLinkedExternalProviders(
       );
 
       logger.info(
-        `Linked provider ${providerId} resolved: language=${language ?? "default"}, name=${trimString(result?.name) ?? "none"}, status=${normalizeBusinessStatus(result?.business_status) ?? (result?.permanently_closed ? "CLOSED_PERMANENTLY" : "none")}, distance=${distanceMeters ?? "n/a"}, types=${Array.isArray(result?.types) ? result.types.join(",") : "none"}, openingHours=${googleOpeningHours ? googleOpeningHours.length : "unsupported"}`
+        `Linked provider ${providerId} resolved: language=${language ?? "default"}, name=${trimString(result?.name) ?? "none"}, status=${normalizeBusinessStatus(result?.business_status) ?? (result?.permanently_closed ? "CLOSED_PERMANENTLY" : "none")}, distance=${distanceMeters ?? "n/a"}, withinVenueGeometry=${isWithinVenueGeometry}, types=${Array.isArray(result?.types) ? result.types.join(",") : "none"}, openingHours=${googleOpeningHours ? googleOpeningHours.length : "unsupported"}`
       );
 
       findings = buildExternalProviderValidationFindings(

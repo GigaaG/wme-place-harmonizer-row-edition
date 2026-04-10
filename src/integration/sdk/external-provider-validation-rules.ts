@@ -9,11 +9,13 @@ import type {
 } from "../../types/settings.ts";
 import {
   CATEGORY_GOOGLE_PLACE_TYPE_MAP,
+  CATEGORY_GOOGLE_VALIDATION_TYPE_MAP,
   buildGoogleMapsPlaceUrl,
   scoreExternalProviderName
 } from "./external-provider-suggestions.ts";
 import {
   buildOpeningHoursValueFromNormalizedSlots,
+  formatOpeningHoursDisplay,
   formatWmeOpeningHoursDisplay,
   isTwentyFourSevenNormalizedHours,
   normalizeCurrentOpeningHours
@@ -32,6 +34,48 @@ import {
 const EXTERNAL_PROVIDER_VALIDATION_NAME_MATCH_THRESHOLD = 0.92;
 const EXTERNAL_PROVIDER_VALIDATION_LOCATION_DRIFT_THRESHOLD_METERS = 250;
 const EXTERNAL_PROVIDER_VALIDATION_RULE_ID_PREFIX = "externalProvider.validation.";
+const GENERIC_GOOGLE_PLACE_TYPES = new Set([
+  "establishment",
+  "point_of_interest",
+  "premise",
+  "subpremise",
+  "food",
+  "health",
+  "store"
+]);
+const GOOGLE_PLACE_TYPE_FAMILIES: readonly (readonly string[])[] = [
+  ["restaurant", "meal_takeaway", "meal_delivery", "cafe", "bakery", "bar"],
+  ["store", "supermarket", "convenience_store", "shopping_mall", "department_store"],
+  ["car_repair", "car_wash", "car_dealer", "car_rental", "gas_station"],
+  ["doctor", "hospital", "pharmacy", "veterinary_care", "dentist"],
+  ["school", "primary_school", "secondary_school", "university"],
+  [
+    "bus_station",
+    "train_station",
+    "subway_station",
+    "transit_station",
+    "taxi_stand",
+    "airport"
+  ],
+  ["park", "tourist_attraction", "stadium", "amusement_park", "zoo", "aquarium"],
+  ["local_government_office", "city_hall", "courthouse", "embassy", "post_office"],
+  ["church", "mosque", "synagogue", "hindu_temple"],
+  ["lodging", "campground", "rv_park"],
+  ["bank", "atm"],
+  ["beauty_salon", "hair_care", "spa"],
+  ["gym", "sports_complex"],
+  ["movie_theater", "art_gallery", "museum", "night_club", "bowling_alley"],
+  ["florist", "home_goods_store", "furniture_store", "hardware_store", "electronics_store"]
+];
+const GOOGLE_PLACE_TYPE_FAMILY_MAP = new Map<string, string>();
+
+for (const family of GOOGLE_PLACE_TYPE_FAMILIES) {
+  const familyKey = family[0];
+
+  for (const placeType of family) {
+    GOOGLE_PLACE_TYPE_FAMILY_MAP.set(placeType, familyKey);
+  }
+}
 
 function normalizeGooglePlaceTypes(types: unknown): string[] {
   if (!Array.isArray(types)) {
@@ -51,12 +95,91 @@ function resolveExpectedGooglePlaceTypes(categories: string[] = []): string[] {
   const expectedTypes = new Set<string>();
 
   for (const category of categories) {
-    for (const placeType of CATEGORY_GOOGLE_PLACE_TYPE_MAP[category] ?? []) {
+    for (const placeType of CATEGORY_GOOGLE_VALIDATION_TYPE_MAP[category] ?? []) {
       expectedTypes.add(placeType.toLowerCase());
     }
   }
 
   return Array.from(expectedTypes).sort();
+}
+
+function resolveExactGooglePlaceTypes(categories: string[] = []): string[] {
+  const exactTypes = new Set<string>();
+
+  for (const category of categories) {
+    for (const placeType of CATEGORY_GOOGLE_PLACE_TYPE_MAP[category] ?? []) {
+      exactTypes.add(placeType.toLowerCase());
+    }
+  }
+
+  return Array.from(exactTypes).sort();
+}
+
+function expandGooglePlaceTypesWithFamilies(types: readonly string[]): string[] {
+  const expandedTypes = new Set<string>();
+
+  for (const type of types) {
+    expandedTypes.add(type);
+
+    const family = GOOGLE_PLACE_TYPE_FAMILY_MAP.get(type);
+
+    if (family) {
+      expandedTypes.add(family);
+    }
+  }
+
+  return Array.from(expandedTypes).sort();
+}
+
+function hasCompatibleGooglePlaceTypeOverlap(
+  googleTypes: readonly string[],
+  expectedGoogleTypes: readonly string[]
+): boolean {
+  const normalizedGoogleTypes = expandGooglePlaceTypesWithFamilies(googleTypes);
+  const normalizedExpectedGoogleTypes = expandGooglePlaceTypesWithFamilies(
+    expectedGoogleTypes
+  );
+
+  return normalizedGoogleTypes.some((type) =>
+    normalizedExpectedGoogleTypes.includes(type)
+  );
+}
+
+type GoogleCategoryMatchKind =
+  | "exact"
+  | "compatible"
+  | "too_generic"
+  | "mismatch";
+
+function classifyGoogleCategoryMatch(params: {
+  googleTypes: readonly string[];
+  exactExpectedGoogleTypes: readonly string[];
+  compatibleExpectedGoogleTypes: readonly string[];
+}): GoogleCategoryMatchKind {
+  const { googleTypes, exactExpectedGoogleTypes, compatibleExpectedGoogleTypes } =
+    params;
+
+  if (
+    googleTypes.some((type) => exactExpectedGoogleTypes.includes(type))
+  ) {
+    return "exact";
+  }
+
+  if (
+    hasCompatibleGooglePlaceTypeOverlap(googleTypes, compatibleExpectedGoogleTypes)
+  ) {
+    return "compatible";
+  }
+
+  const specificGoogleTypes = googleTypes.filter(
+    (type) => !GENERIC_GOOGLE_PLACE_TYPES.has(type)
+  );
+
+  if (specificGoogleTypes.length === 0) {
+    return "too_generic";
+  }
+
+  return "mismatch";
 }
 
 function arraysEqual(left: string[], right: string[]): boolean {
@@ -186,7 +309,8 @@ export function buildExternalProviderValidationFindings(
   const googleOpeningHoursDisplay =
     isTwentyFourSevenNormalizedHours(snapshot.googleOpeningHours)
       ? t("common.twentyFourSeven")
-      : snapshot.googleOpeningHoursDisplay;
+      : formatOpeningHoursDisplay(undefined, snapshot.googleOpeningHours) ??
+        snapshot.googleOpeningHoursDisplay;
   const severities = {
     ...getDefaultGoogleMapsValidationSeverities(),
     ...(config?.severity ?? {})
@@ -296,15 +420,23 @@ export function buildExternalProviderValidationFindings(
   }
 
   const googleTypes = normalizeGooglePlaceTypes(snapshot.googleTypes);
+  const exactExpectedGoogleTypes = resolveExactGooglePlaceTypes(
+    snapshot.currentCategories ?? []
+  );
   const expectedGoogleTypes = resolveExpectedGooglePlaceTypes(
     snapshot.currentCategories ?? []
   );
+  const categoryMatchKind = classifyGoogleCategoryMatch({
+    googleTypes,
+    exactExpectedGoogleTypes,
+    compatibleExpectedGoogleTypes: expectedGoogleTypes
+  });
 
   if (
     isValidationEnabled(settings, "category") &&
     googleTypes.length > 0 &&
     expectedGoogleTypes.length > 0 &&
-    !googleTypes.some((type) => expectedGoogleTypes.includes(type))
+    categoryMatchKind === "mismatch"
   ) {
     findings.push(
       buildValidationFinding({

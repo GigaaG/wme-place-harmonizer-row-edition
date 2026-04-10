@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   buildExternalProviderValidationFindings,
   validateLinkedExternalProviders
 } from "../src/integration/sdk/external-provider-validation.ts";
+import { formatOpeningHoursDisplay } from "../src/integration/sdk/external-provider-validation-hours.ts";
+import { setRuntimeLocale } from "../src/i18n/runtime.ts";
+import type { LocaleFile } from "../src/types/i18n.ts";
 
 function getSingleFinding(ruleId: string, findings: ReturnType<typeof buildExternalProviderValidationFindings>) {
   const finding = findings.find((entry) => entry.issue.ruleId === ruleId);
@@ -173,9 +177,12 @@ runTest("flags linked providers when Google opening hours differ", () => {
   assert.equal(finding.issue.field, "openingHours");
   assert.equal(
     finding.proposal.displayCurrentValue,
-    "1:09:00-18:00, 2:09:00-18:00, 3:09:00-18:00, 4:09:00-18:00, 5:09:00-18:00"
+    "Monday: 09:00-18:00 | Tuesday: 09:00-18:00 | Wednesday: 09:00-18:00 | Thursday: 09:00-18:00 | Friday: 09:00-18:00"
   );
-  assert.equal(finding.proposal.displayProposedValue, "Mon-Fri: 8:00 AM-6:00 PM");
+  assert.equal(
+    finding.proposal.displayProposedValue,
+    "Monday: 08:00-18:00 | Tuesday: 08:00-18:00 | Wednesday: 08:00-18:00 | Thursday: 08:00-18:00 | Friday: 08:00-18:00"
+  );
   assert.equal(finding.proposal.field, "openingHours");
   assert.equal(finding.proposal.isApplySupported, true);
   assert.equal(finding.proposal.actionType, "set-field");
@@ -214,6 +221,58 @@ runTest("builds applyable opening hours proposals when Google hours can be mappe
       days: [1, 2, 3, 4, 5],
       fromHour: "08:00",
       toHour: "18:00"
+    }
+  ]);
+});
+
+runTest("builds compact cross-midnight WME opening-hours payloads from Google hours", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-apply-overnight",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [],
+      googleOpeningHours: [
+        "0:08:00-24:00",
+        "1:00:00-02:00",
+        "1:07:00-24:00",
+        "2:00:00-02:00",
+        "2:07:00-24:00",
+        "3:00:00-02:00",
+        "3:07:00-24:00",
+        "4:00:00-02:00",
+        "4:07:00-24:00",
+        "5:00:00-04:00",
+        "5:07:00-24:00",
+        "6:00:00-05:00",
+        "6:08:00-02:00"
+      ],
+      googleOpeningHoursDisplay:
+        "maandag: 07:00-02:00 | dinsdag: 07:00-02:00 | woensdag: 07:00-02:00 | donderdag: 07:00-02:00 | vrijdag: 07:00-04:00 | zaterdag: 07:00-05:00 | zondag: 08:00-02:00"
+    })
+  );
+
+  assert.deepEqual(finding.proposal.proposedValue, [
+    {
+      days: [0, 6],
+      fromHour: "08:00",
+      toHour: "02:00"
+    },
+    {
+      days: [1, 2, 3],
+      fromHour: "07:00",
+      toHour: "02:00"
+    },
+    {
+      days: [4],
+      fromHour: "07:00",
+      toHour: "04:00"
+    },
+    {
+      days: [5],
+      fromHour: "07:00",
+      toHour: "05:00"
     }
   ]);
 });
@@ -342,6 +401,108 @@ runTest("shows missing as the current value when WME opening hours are empty", (
   assert.equal(finding.proposal.displayCurrentValue, "missing");
 });
 
+runTest("renders WME overnight hours as a single cross-midnight range per day", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-current-overnight-display",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [
+        {
+          days: [1, 2, 3, 4],
+          fromHour: "08:00",
+          toHour: "02:00"
+        },
+        {
+          days: [5, 6],
+          fromHour: "08:00",
+          toHour: "04:00"
+        },
+        {
+          days: [0],
+          fromHour: "08:00",
+          toHour: "02:00"
+        }
+      ],
+      googleOpeningHours: [
+        "1:07:00-02:00"
+      ],
+      googleOpeningHoursDisplay: "maandag: 07:00-02:00"
+    })
+  );
+
+  assert.equal(
+    finding.proposal.displayCurrentValue,
+    "Monday: 08:00-02:00 | Tuesday: 08:00-02:00 | Wednesday: 08:00-02:00 | Thursday: 08:00-02:00 | Friday: 08:00-04:00 | Saturday: 08:00-04:00 | Sunday: 08:00-02:00"
+  );
+});
+
+runTest("localizes Google weekday text to the runtime locale", () => {
+  const dutchLocale = JSON.parse(
+    readFileSync(
+      new URL("../../wme-place-harmonizer-row-data/locales/nl.json", import.meta.url),
+      "utf8"
+    )
+  ) as LocaleFile;
+  const englishLocale = JSON.parse(
+    readFileSync(
+      new URL("../../wme-place-harmonizer-row-data/locales/en.json", import.meta.url),
+      "utf8"
+    )
+  ) as LocaleFile;
+
+  setRuntimeLocale(dutchLocale);
+
+  try {
+    assert.equal(
+      formatOpeningHoursDisplay(
+        [
+          "Monday: 7:00 AM-6:00 PM",
+          "Tuesday: 7:00 AM-6:00 PM",
+          "Wednesday: 7:00 AM-6:00 PM",
+          "Thursday: 7:00 AM-6:00 PM",
+          "Friday: 7:00 AM-6:00 PM"
+        ],
+        [
+          "1:07:00-18:00",
+          "2:07:00-18:00",
+          "3:07:00-18:00",
+          "4:07:00-18:00",
+          "5:07:00-18:00"
+        ]
+      ),
+      "maandag: 07:00-18:00 | dinsdag: 07:00-18:00 | woensdag: 07:00-18:00 | donderdag: 07:00-18:00 | vrijdag: 07:00-18:00"
+    );
+  } finally {
+    setRuntimeLocale(englishLocale);
+  }
+});
+
+runTest("renders fallback Google opening hours with weekday labels when weekday text is unavailable", () => {
+  const finding = getSingleFinding(
+    "externalProvider.validation.openingHoursDifferent",
+    buildExternalProviderValidationFindings({
+      providerId: "provider-hours-google-fallback-display",
+      venueName: "Starbucks",
+      placeName: "Starbucks Central",
+      currentOpeningHours: [],
+      googleOpeningHours: [
+        "1:07:00-18:00",
+        "2:07:00-18:00",
+        "3:07:00-18:00",
+        "4:07:00-18:00",
+        "5:07:00-18:00"
+      ]
+    })
+  );
+
+  assert.equal(
+    finding.proposal.displayProposedValue,
+    "Monday: 07:00-18:00 | Tuesday: 07:00-18:00 | Wednesday: 07:00-18:00 | Thursday: 07:00-18:00 | Friday: 07:00-18:00"
+  );
+});
+
 runTest("flags linked providers when Google place types do not match mapped WME categories", () => {
   const finding = getSingleFinding(
     "externalProvider.validation.categoryMismatch",
@@ -380,6 +541,119 @@ runTest("does not flag categories when mapped Google place types overlap", () =>
         finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
     ),
     false
+  );
+});
+
+runTest("does not flag categories when Google types are compatible with the mapped family", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-family-ok",
+    venueName: "Snackbar Damrak",
+    placeName: "Snackbar Damrak",
+    currentCategories: ["FAST_FOOD"],
+    googleTypes: ["cafe", "establishment", "food", "point_of_interest", "store"]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    false
+  );
+});
+
+runTest("does not flag categories when Google only exposes too-generic types", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-too-generic",
+    venueName: "Snackbar Damrak",
+    placeName: "Snackbar Damrak",
+    currentCategories: ["FAST_FOOD"],
+    googleTypes: ["establishment", "food", "point_of_interest", "store"]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    false
+  );
+});
+
+runTest("does not flag categories when Google uses a sibling transport type", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-transport-family-ok",
+    venueName: "Amsterdam Centraal",
+    placeName: "Amsterdam Centraal",
+    currentCategories: ["TRAIN_STATION"],
+    googleTypes: ["transit_station", "point_of_interest", "establishment"]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    false
+  );
+});
+
+runTest("does not flag categories when Google uses grocery_or_supermarket for supermarkets", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-grocery-ok",
+    venueName: "Albert Heijn",
+    placeName: "Albert Heijn",
+    currentCategories: ["SUPERMARKET_GROCERY"],
+    googleTypes: [
+      "grocery_or_supermarket",
+      "food",
+      "point_of_interest",
+      "establishment"
+    ]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    false
+  );
+});
+
+runTest("does not flag categories when Google uses health for clinics", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-health-ok",
+    venueName: "Huisartsenpraktijk Damrak",
+    placeName: "Huisartsenpraktijk Damrak",
+    currentCategories: ["DOCTOR_CLINIC"],
+    googleTypes: ["health", "point_of_interest", "establishment"]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    false
+  );
+});
+
+runTest("still flags categories when Google has a clear incompatible specific type", () => {
+  const findings = buildExternalProviderValidationFindings({
+    providerId: "provider-category-real-mismatch",
+    venueName: "Shell Damrak",
+    placeName: "Shell Damrak",
+    currentCategories: ["GAS_STATION"],
+    googleTypes: ["restaurant", "establishment", "point_of_interest"]
+  });
+
+  assert.equal(
+    findings.some(
+      (finding) =>
+        finding.issue.ruleId === "externalProvider.validation.categoryMismatch"
+    ),
+    true
   );
 });
 
@@ -570,6 +844,113 @@ await runAsyncTest(
       } finally {
         hostWindow.window = previousWindow;
         hostWindow.document = previousDocument;
+    }
+  }
+);
+
+await runAsyncTest(
+  "does not flag location drift when the Google point lies inside a WME polygon",
+  async () => {
+    const hostWindow = globalThis as typeof globalThis & {
+      window?: any;
+      document?: any;
+    };
+    const previousWindow = hostWindow.window;
+    const previousDocument = hostWindow.document;
+
+    class FakePlacesService {
+      constructor(_container: unknown) {
+        // The validation path only needs a constructible PlacesService.
+      }
+
+      getDetails(
+        _request: Record<string, unknown>,
+        callback: (result: any, status: unknown) => void
+      ): void {
+        callback(
+          {
+            place_id: "provider-inside-polygon",
+            name: "Starbucks Polygon",
+            formatted_address: "Damrak 10, Amsterdam",
+            geometry: {
+              location: {
+                lat: 52.001,
+                lng: 5.001
+              }
+            }
+          },
+          "OK"
+        );
+      }
+    }
+
+    hostWindow.window = {
+      google: {
+        maps: {
+          places: {
+            PlacesService: FakePlacesService,
+            PlacesServiceStatus: {
+              OK: "OK",
+              NOT_FOUND: "NOT_FOUND",
+              INVALID_REQUEST: "INVALID_REQUEST",
+              ZERO_RESULTS: "ZERO_RESULTS"
+            }
+          }
+        }
+      }
+    };
+    hostWindow.document = {
+      body: {
+        appendChild() {
+          return undefined;
+        }
+      },
+      createElement() {
+        return { style: {} };
+      }
+    };
+
+    try {
+      const validation = await validateLinkedExternalProviders({
+        venueName: "Starbucks Polygon",
+        externalProviderIds: ["provider-inside-polygon"],
+        venue: {
+          geometry: {
+            type: "Polygon",
+            coordinates: [[
+              [5.0, 52.0],
+              [5.01, 52.0],
+              [5.01, 52.01],
+              [5.0, 52.01],
+              [5.0, 52.0]
+            ]]
+          }
+        },
+        currentCategories: [],
+        currentOpeningHours: [],
+        settings: {
+          enabled: true,
+          checks: {
+            notFound: true,
+            closed: true,
+            locationDrift: true,
+            nameMismatch: true,
+            category: true,
+            openingHours: true
+          }
+        }
+      });
+
+      assert.equal(
+        validation.issues.some(
+          (issue) => issue.ruleId === "externalProvider.validation.locationDrift"
+        ),
+        false
+      );
+      assert.equal(validation.proposals.length, 0);
+    } finally {
+      hostWindow.window = previousWindow;
+      hostWindow.document = previousDocument;
     }
   }
 );

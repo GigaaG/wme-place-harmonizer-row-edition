@@ -53,6 +53,7 @@ function runTest(name: string, fn: () => Promise<void>): Promise<void> {
 
 async function renderSidebarHtml(state: SidebarDebugState): Promise<string> {
   const hostGlobal = globalThis as typeof globalThis & {
+    document?: Document;
     window?: Window & {
       getWmeSdk?: () => {
         Sidebar: {
@@ -77,6 +78,7 @@ async function renderSidebarHtml(state: SidebarDebugState): Promise<string> {
     };
   };
   const tabPane = { innerHTML: "" } as HTMLElement;
+  const originalDocument = hostGlobal.document;
   const hostWindow =
     hostGlobal.window ??
     ({} as Window & {
@@ -94,6 +96,11 @@ async function renderSidebarHtml(state: SidebarDebugState): Promise<string> {
   const originalUnsafeWindowGetWmeSdk = hostGlobal.unsafeWindow?.getWmeSdk;
 
   hostGlobal.window = hostWindow;
+  hostGlobal.document = {
+    contains(node: unknown) {
+      return node === tabPane;
+    }
+  } as Document;
   hostWindow.getWmeSdk = () => ({
     Sidebar: {
       async registerScriptTab() {
@@ -126,6 +133,8 @@ async function renderSidebarHtml(state: SidebarDebugState): Promise<string> {
     } else {
       delete hostWindow.getWmeSdk;
     }
+
+    hostGlobal.document = originalDocument;
 
     if (hostGlobal.unsafeWindow) {
       if (originalUnsafeWindowGetWmeSdk) {

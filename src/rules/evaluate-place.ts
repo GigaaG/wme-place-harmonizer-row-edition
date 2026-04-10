@@ -2,7 +2,11 @@ import type { PlaceLike } from "../types/place";
 import type { EffectivePlacePolicy } from "../types/policy";
 import type { PlaceIssue } from "../types/issue";
 import type { ChainRecord } from "../types/chains";
-import type { AddressPolicy, PresenceRequirement } from "../types/address";
+import type {
+  AddressPolicy,
+  EnforcedPresenceRequirement,
+  PresenceRequirement
+} from "../types/address";
 import type {
   RuleConfig,
   PhoneFormattingConfig,
@@ -111,10 +115,15 @@ function buildPresenceIssue(params: {
   requirement: PresenceRequirement;
   hasValue: boolean;
   currentValue?: unknown;
-  messages: Record<PresenceRequirement, string>;
+  messages: Record<EnforcedPresenceRequirement, string>;
 }): PlaceIssue | undefined {
   const { field, rulePrefix, requirement, hasValue, currentValue, messages } =
     params;
+
+  if (requirement === "optional") {
+    return undefined;
+  }
+
   const ruleId = `${rulePrefix}.${requirement}`;
 
   if (requirement === "required" && !hasValue) {

@@ -1,8 +1,14 @@
 export type PresenceRequirement =
   | "required"
   | "recommended"
+  | "optional"
   | "discouraged"
   | "forbidden";
+
+export type EnforcedPresenceRequirement = Exclude<
+  PresenceRequirement,
+  "optional"
+>;
 
 export type AddressFieldRequirement = PresenceRequirement;
 

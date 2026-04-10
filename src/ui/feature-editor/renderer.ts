@@ -1,11 +1,19 @@
-import { ensureFeatureEditorContainer } from "./container";
-import type { PlaceIssue } from "../../types/issue";
+import { ensureFeatureEditorContainer } from "./container.ts";
+import type { PlaceIssue, IssueSeverity } from "../../types/issue";
 import type { PlaceProposal } from "../../types/proposal";
 import {
   groupIssuesForFeatureEditor,
   type FeatureEditorIssueGroup
-} from "./issue-groups";
+} from "./issue-groups.ts";
 import { t } from "../../i18n/runtime.ts";
+
+export interface PendingWhitelistRenderAction {
+  groupKey: string;
+  field: string;
+  severity: IssueSeverity;
+  message: string;
+  expiresInSeconds: number;
+}
 
 function getSeverityIcon(severity: string): string {
   if (severity === "error") {
@@ -59,6 +67,42 @@ function getSeverityColors(severity: string): {
   };
 }
 
+function getInlineActionButtonStyle(color: string): string {
+  return [
+    "background:none",
+    "border:none",
+    "padding:0",
+    "margin:0",
+    `color:${color}`,
+    "font-size:12px",
+    "font-weight:600",
+    "line-height:1.2",
+    "cursor:pointer",
+    "text-decoration:underline",
+    "text-underline-offset:2px",
+    "white-space:nowrap"
+  ].join(";");
+}
+
+function renderIssueCardFooter(
+  content: string,
+  justifyContent = "flex-end"
+): string {
+  return `
+    <div style="
+      margin-top:8px;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:${justifyContent};
+      column-gap:8px;
+      row-gap:4px;
+    ">
+      ${content}
+    </div>
+  `;
+}
+
 function escapeHtml(value: unknown): string {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -110,7 +154,8 @@ function formatLinkedProposalValue(
 function renderProposal(
   issue: PlaceIssue,
   proposal: PlaceProposal,
-  index: number
+  index: number,
+  renderApplyControl = true
 ): string {
   let html = "";
 
@@ -159,7 +204,7 @@ function renderProposal(
     `;
   }
 
-  if (proposal.isApplySupported) {
+  if (proposal.isApplySupported && renderApplyControl) {
     html += `
       <label style="display:block;margin-top:6px;">
         <input
@@ -273,6 +318,13 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
   let html = "";
   const colors = getSeverityColors(group.severity);
   const canWhitelist = group.issues.some((issue) => !!issue.ruleId);
+  const shouldRenderSharedFooterCheckbox =
+    !shouldRenderAsSingleChoiceGroup(group) &&
+    group.proposals.length === 1 &&
+    group.proposals[0].isApplySupported;
+  const footerCheckboxProposal = shouldRenderSharedFooterCheckbox
+    ? group.proposals[0]
+    : null;
 
   html += `
     <div style="
@@ -302,23 +354,113 @@ function renderIssue(group: FeatureEditorIssueGroup): string {
     html += renderExternalProviderChoiceGroup(group.issues[0], group);
   } else {
     for (let index = 0; index < group.proposals.length; index += 1) {
-      html += renderProposal(group.issues[0], group.proposals[index], index);
+      html += renderProposal(
+        group.issues[0],
+        group.proposals[index],
+        index,
+        !footerCheckboxProposal
+      );
     }
   }
 
-  if (canWhitelist) {
-    html += `
-      <div style="margin-top:8px;">
+  if (footerCheckboxProposal || canWhitelist) {
+    let footerContent = "";
+
+    if (footerCheckboxProposal) {
+      footerContent += `
+        <label style="
+          display:flex;
+          align-items:center;
+          gap:4px;
+          font-size:12px;
+          font-weight:600;
+          margin:0;
+          flex:1 1 auto;
+          min-width:0;
+        ">
+          <input
+            type="checkbox"
+            class="wmeph-row-apply-checkbox"
+            data-proposal-id="${escapeHtml(footerCheckboxProposal.id ?? "")}"
+          />
+          <span>${escapeHtml(t("featureEditor.applyThisFix"))}</span>
+        </label>
+      `;
+    }
+
+    if (canWhitelist) {
+      footerContent += `
         <button
           type="button"
           class="wmeph-row-whitelist-issue"
           data-group-key="${escapeHtml(group.key)}"
+          style="${getInlineActionButtonStyle(colors.text)}"
         >
           ${escapeHtml(t("featureEditor.ignoreForThisVenue"))}
         </button>
-      </div>
-    `;
+      `;
+    }
+
+    html += renderIssueCardFooter(
+      footerContent,
+      footerCheckboxProposal && canWhitelist ? "space-between" : "flex-end"
+    );
   }
+
+  html += `</div>`;
+
+  return html;
+}
+
+function renderPendingWhitelistAction(
+  action: PendingWhitelistRenderAction
+): string {
+  let html = "";
+  const colors = getSeverityColors(action.severity);
+
+  html += `
+    <div style="
+      border: 1px dashed ${colors.border};
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      background: ${colors.background};
+      opacity: 0.92;
+    ">
+  `;
+
+  html += `
+    <div style="font-weight:600; margin-bottom:4px; color:${colors.text};">
+      ${getSeverityIcon(action.severity)} ${escapeHtml(getSeverityLabel(action.severity))}: ${escapeHtml(action.message)}
+    </div>
+  `;
+
+  html += `
+    <div style="font-size:12px;color:#666;margin-bottom:4px;">
+      ${escapeHtml(t("featureEditor.field"))}: ${escapeHtml(action.field)}
+    </div>
+  `;
+
+  html += renderIssueCardFooter(
+    `
+      <span
+        class="wmeph-row-pending-whitelist-message"
+        data-group-key="${escapeHtml(action.groupKey)}"
+        style="font-size:12px; color:${colors.text};"
+      >
+        ${escapeHtml(t("featureEditor.ignorePending"))}
+      </span>
+      <button
+        type="button"
+        class="wmeph-row-undo-whitelist"
+        data-group-key="${escapeHtml(action.groupKey)}"
+        style="${getInlineActionButtonStyle(colors.text)}"
+      >
+        ${escapeHtml(t("featureEditor.undoIgnore"))} (${action.expiresInSeconds}s)
+      </button>
+    `,
+    "space-between"
+  );
 
   html += `</div>`;
 
@@ -330,7 +472,8 @@ export function renderFeatureEditorAnalysis(
   chainId: string | null,
   issues: PlaceIssue[],
   proposals: PlaceProposal[],
-  statusMessage?: { kind: "success" | "warning" | "error"; text: string }
+  statusMessage?: { kind: "success" | "warning" | "error"; text: string },
+  pendingWhitelistActions: PendingWhitelistRenderAction[] = []
 ): void {
   const container = ensureFeatureEditorContainer();
 
@@ -339,7 +482,19 @@ export function renderFeatureEditorAnalysis(
   }
 
   let html = "";
+  const pendingWhitelistActionsByGroupKey = new Map(
+    pendingWhitelistActions.map((action) => [action.groupKey, action])
+  );
   const issueGroups = groupIssuesForFeatureEditor(issues, proposals);
+  const issueGroupKeys = new Set(issueGroups.map((group) => group.key));
+  const visibleIssueGroups = issueGroups.filter(
+    (group) => !pendingWhitelistActionsByGroupKey.has(group.key)
+  );
+  const displayedFindingCount =
+    issueGroups.length +
+    pendingWhitelistActions.filter(
+      (action) => !issueGroupKeys.has(action.groupKey)
+    ).length;
 
   html += `
   <div style="
@@ -352,11 +507,14 @@ export function renderFeatureEditorAnalysis(
     ${escapeHtml(t("featureEditor.title"))}
   </div>
 
-  <div style="
-    overflow-y:auto;
-    max-height:260px;
-    padding-right:4px;
-  ">
+  <div
+    data-wmeph-row-scroll-container="true"
+    style="
+      overflow-y:auto;
+      max-height:260px;
+      padding-right:4px;
+    "
+  >
   `;
 
   if (statusMessage) {
@@ -401,11 +559,11 @@ export function renderFeatureEditorAnalysis(
   html += `
     <div style="margin-bottom:8px;">
       <div><b>${escapeHtml(t("featureEditor.findings"))}</b></div>
-      <div>${issueGroups.length}</div>
+      <div>${displayedFindingCount}</div>
     </div>
   `;
 
-  if (issueGroups.length === 0) {
+  if (displayedFindingCount === 0) {
     html += `
       <div style="
         border: 1px solid #ddd;
@@ -418,12 +576,32 @@ export function renderFeatureEditorAnalysis(
       </div>
     `;
   } else {
+    const renderedPendingGroupKeys = new Set<string>();
+
     for (const group of issueGroups) {
+      const pendingWhitelistAction = pendingWhitelistActionsByGroupKey.get(group.key);
+
+      if (pendingWhitelistAction) {
+        renderedPendingGroupKeys.add(group.key);
+        html += renderPendingWhitelistAction(pendingWhitelistAction);
+        continue;
+      }
+
       html += renderIssue(group);
+    }
+
+    for (const pendingWhitelistAction of pendingWhitelistActions) {
+      if (renderedPendingGroupKeys.has(pendingWhitelistAction.groupKey)) {
+        continue;
+      }
+
+      html += renderPendingWhitelistAction(pendingWhitelistAction);
     }
   }
 
-  const hasApplyableProposals = proposals.some((proposal) => proposal.isApplySupported);
+  const hasApplyableProposals = visibleIssueGroups.some((group) =>
+    group.proposals.some((proposal) => proposal.isApplySupported)
+  );
 
   if (hasApplyableProposals) {
     html += `

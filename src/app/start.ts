@@ -25,7 +25,10 @@ import {
   getWmeSdk
 } from "../integration/sdk/wme";
 import { onFeatureEditorOpened } from "../integration/sdk/feature-editor";
-import { renderFeatureEditorAnalysis } from "../ui/feature-editor/renderer";
+import {
+  renderFeatureEditorAnalysis,
+  type PendingWhitelistRenderAction
+} from "../ui/feature-editor/renderer";
 import { groupIssuesForFeatureEditor } from "../ui/feature-editor/issue-groups";
 import {
   setLatestAnalysisState,
@@ -45,16 +48,17 @@ import { renderSidebarDebugPanel } from "../ui/sidebar/renderer";
 import {
   wireSidebarPanelActions,
   wireSidebarReloadButton,
+  wireSidebarScanButton,
+  wireSidebarAutoScanToggle,
+  wireSidebarNaturalFeaturesHighlightToggle,
   wireSidebarGoogleMapsValidationChecks,
   wireSidebarGoogleMapsValidationToggle
 } from "../ui/sidebar/actions";
 import { getVisibleVenues } from "../integration/sdk/visible-venues";
 import { scanVisibleVenues } from "./scan-visible-venues";
-import { wireSidebarScanButton } from "../ui/sidebar/actions";
 import { ensureHighlightLayer, renderHighlights } from "../highlighter/highlighter-manager";
 import { registerAutoScanListeners } from "../integration/sdk/map-auto-scan";
 import { registerVenueSaveScanListener } from "../integration/sdk/venue-save-scan";
-import { wireSidebarAutoScanToggle } from "../ui/sidebar/actions";
 import { normalizeCountryCode } from "../config/country-code";
 import { DATA_REPOSITORY_BRANCH } from "../config/source";
 import {
@@ -77,6 +81,12 @@ import {
   filterWhitelistedAnalysis,
   upsertWhitelistEntries
 } from "../whitelist/manager";
+import {
+  cancelPendingWhitelistAction,
+  getPendingWhitelistActionsForVenue,
+  schedulePendingWhitelistAction,
+  type PendingWhitelistAction
+} from "../whitelist/pending-actions";
 import { loadBestAvailableLocale } from "../i18n/locale-loader.ts";
 import { setRuntimeLocale, t } from "../i18n/runtime.ts";
 import type {
@@ -96,6 +106,7 @@ let runtimeSettings: UserSettings | null = null;
 let runtimeCountry: string | undefined;
 let externalProviderSuggestionRequestId = 0;
 let externalProviderValidationRequestId = 0;
+let pendingWhitelistRenderTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
 //
 // Functions
@@ -409,22 +420,121 @@ function applyWhitelistToAnalysis(params: {
   });
 }
 
+function getPendingWhitelistRenderActions(
+  venueId: string
+): PendingWhitelistRenderAction[] {
+  const now = Date.now();
+
+  return getPendingWhitelistActionsForVenue(venueId).map((action) => ({
+    groupKey: action.groupKey,
+    field: action.field,
+    severity: action.severity,
+    message: action.message,
+    expiresInSeconds: Math.max(
+      1,
+      Math.ceil((action.expiresAt - now) / 1000)
+    )
+  }));
+}
+
+function getFeatureEditorScrollContainer(): HTMLElement | null {
+  return document.querySelector<HTMLElement>(
+    '#wmeph-row-feature-editor [data-wmeph-row-scroll-container="true"]'
+  );
+}
+
+function cancelPendingWhitelistRenderTimer(): void {
+  if (pendingWhitelistRenderTimer !== null) {
+    globalThis.clearTimeout(pendingWhitelistRenderTimer);
+    pendingWhitelistRenderTimer = null;
+  }
+}
+
+function refreshPendingWhitelistCountdowns(venueId: string): void {
+  const pendingWhitelistActions = getPendingWhitelistRenderActions(venueId);
+
+  if (pendingWhitelistActions.length === 0) {
+    cancelPendingWhitelistRenderTimer();
+    return;
+  }
+
+  for (const action of pendingWhitelistActions) {
+    const message = document.querySelector<HTMLElement>(
+      `.wmeph-row-pending-whitelist-message[data-group-key="${CSS.escape(action.groupKey)}"]`
+    );
+
+    if (message) {
+      message.textContent = t("featureEditor.ignorePending");
+    }
+
+    const button = document.querySelector<HTMLButtonElement>(
+      `.wmeph-row-undo-whitelist[data-group-key="${CSS.escape(action.groupKey)}"]`
+    );
+
+    if (button) {
+      button.textContent = `${t("featureEditor.undoIgnore")} (${action.expiresInSeconds}s)`;
+    }
+  }
+}
+
+function schedulePendingWhitelistRenderTick(venueId: string): void {
+  cancelPendingWhitelistRenderTimer();
+
+  if (!document.getElementById("wmeph-row-feature-editor")) {
+    return;
+  }
+
+  if (getPendingWhitelistActionsForVenue(venueId).length === 0) {
+    return;
+  }
+
+  pendingWhitelistRenderTimer = globalThis.setTimeout(() => {
+    pendingWhitelistRenderTimer = null;
+
+    const latest = getLatestAnalysisState();
+
+    if (!latest?.isVenueSelection || latest.venueId !== venueId) {
+      return;
+    }
+
+    refreshPendingWhitelistCountdowns(venueId);
+    schedulePendingWhitelistRenderTick(venueId);
+  }, 1000);
+}
+
 function renderLatestVenueAnalysis(): void {
   const latest = getLatestAnalysisState();
 
   if (!latest?.isVenueSelection) {
+    cancelPendingWhitelistRenderTimer();
     return;
   }
+
+  const pendingWhitelistActions = getPendingWhitelistRenderActions(latest.venueId);
+  const previousScrollTop = getFeatureEditorScrollContainer()?.scrollTop ?? null;
 
   renderFeatureEditorAnalysis(
     latest.placeName,
     latest.chainId,
     latest.issues,
     latest.proposals,
-    latest.statusMessage
+    latest.statusMessage,
+    pendingWhitelistActions
   );
+  const scrollContainer = getFeatureEditorScrollContainer();
+
+  if (previousScrollTop !== null && scrollContainer) {
+    scrollContainer.scrollTop = previousScrollTop;
+  }
+
   wireApplyButton();
   wireWhitelistButtons();
+  wireUndoWhitelistButtons();
+  if (pendingWhitelistActions.length > 0) {
+    schedulePendingWhitelistRenderTick(latest.venueId);
+  } else {
+    cancelPendingWhitelistRenderTimer();
+  }
 }
 
 async function refreshRuntimeLocale(): Promise<void> {
@@ -698,6 +808,42 @@ async function setAutoScanVisibleVenues(enabled: boolean): Promise<void> {
   }
 }
 
+async function setDisableNaturalFeaturesHighlighting(
+  enabled: boolean
+): Promise<void> {
+  if (!runtimeSettings) {
+    logger.warn(
+      "Cannot update NATURAL_FEATURES highlight setting: runtime settings unavailable"
+    );
+    return;
+  }
+
+  runtimeSettings = {
+    ...runtimeSettings,
+    disableNaturalFeaturesHighlighting: enabled
+  };
+
+  settingsManager.save(runtimeSettings);
+
+  const statusText = enabled
+    ? t("status.naturalFeaturesHighlighting.disabled")
+    : t("status.naturalFeaturesHighlighting.enabled");
+  const sidebarState = getSidebarDebugState();
+
+  if (sidebarState) {
+    setSidebarDebugState({
+      ...sidebarState,
+      ...buildGoogleMapsValidationSidebarState(),
+      disableNaturalFeaturesHighlighting: enabled,
+      lastStatus: statusText
+    });
+
+    await rerenderSidebar();
+  }
+
+  await scanVisibleVenuesFromMap("manual", statusText);
+}
+
 function hasEnabledGoogleMapsValidationChecks(): boolean {
   const checks = getEffectiveRuntimeGoogleMapsValidationSettings()?.checks;
 
@@ -846,6 +992,10 @@ async function rerenderSidebar(): Promise<void> {
     !!state.autoScanVisibleVenues,
     setAutoScanVisibleVenues
   );
+  wireSidebarNaturalFeaturesHighlightToggle(
+    !!state.disableNaturalFeaturesHighlighting,
+    setDisableNaturalFeaturesHighlighting
+  );
   wireSidebarGoogleMapsValidationToggle(
     state.googleMapsValidation?.enabled ?? true,
     setGoogleMapsValidationEnabled
@@ -859,7 +1009,8 @@ async function rerenderSidebar(): Promise<void> {
 }
 
 async function scanVisibleVenuesFromMap(
-  trigger: "manual" | "auto" = "manual"
+  trigger: "manual" | "auto" = "manual",
+  statusOverride?: string
 ): Promise<void> {
   if (!runtimeConfig || !runtimeChains) {
     logger.warn("Cannot scan visible venues: runtime not initialized");
@@ -908,12 +1059,16 @@ async function scanVisibleVenuesFromMap(
   });
 
   const highlightRenderResult = renderHighlights(summary, venues, {
-    keepExistingOnEmpty: trigger === "auto"
+    keepExistingOnEmpty: trigger === "auto",
+    disableNaturalFeaturesHighlighting:
+      runtimeSettings?.disableNaturalFeaturesHighlighting === true
   });
 
-  let statusText = t("status.scannedVisibleVenues", {
-    count: summary.total
-  });
+  let statusText =
+    statusOverride ??
+    t("status.scannedVisibleVenues", {
+      count: summary.total
+    });
 
   if (highlightRenderResult.keptExisting) {
     statusText = t("status.autoScanKeptHighlights");
@@ -1153,6 +1308,40 @@ function buildWhitelistEntriesForGroup(params: {
   return Array.from(entries.values());
 }
 
+async function finalizePendingWhitelistAction(
+  action: PendingWhitelistAction
+): Promise<void> {
+  const changedCount = upsertWhitelistEntries(action.entries);
+  const latest = getLatestAnalysisState();
+
+  if (latest?.isVenueSelection && latest.venueId === action.venueId) {
+    const filteredAnalysis = applyWhitelistToAnalysis({
+      venueId: latest.venueId,
+      issues: latest.issues,
+      proposals: latest.proposals
+    });
+
+    setLatestAnalysisState({
+      ...latest,
+      issues: filteredAnalysis.issues,
+      proposals: filteredAnalysis.proposals,
+      statusMessage: {
+        kind: "success",
+        text:
+          changedCount > 0
+            ? t("status.whitelist.ignored", {
+                count: action.entries.length
+              })
+            : t("status.whitelist.alreadyIgnored")
+      }
+    });
+
+    renderLatestVenueAnalysis();
+  }
+
+  await scanVisibleVenuesFromMap("manual");
+}
+
 function wireWhitelistButtons(): void {
   const buttons = Array.from(
     document.querySelectorAll<HTMLButtonElement>(".wmeph-row-whitelist-issue")
@@ -1202,33 +1391,62 @@ function wireWhitelistButtons(): void {
           return;
         }
 
-        const changedCount = upsertWhitelistEntries(entries);
-        const filteredAnalysis = applyWhitelistToAnalysis({
+        schedulePendingWhitelistAction({
           venueId: latest.venueId,
-          issues: latest.issues,
-          proposals: latest.proposals
-        });
-
-        setLatestAnalysisState({
-          ...latest,
-          issues: filteredAnalysis.issues,
-          proposals: filteredAnalysis.proposals,
-          statusMessage: {
-            kind: "success",
-            text:
-              changedCount > 0
-                ? t("status.whitelist.ignored", {
-                    count: entries.length
-                  })
-                : t("status.whitelist.alreadyIgnored")
+          groupKey,
+          severity: group.severity,
+          message: group.message,
+          field: group.field,
+          entries,
+          onExpire: (action) => {
+            void finalizePendingWhitelistAction(action);
           }
         });
 
         renderLatestVenueAnalysis();
-        await scanVisibleVenuesFromMap("manual");
       } finally {
         button.removeAttribute("disabled");
       }
+    };
+  }
+}
+
+function wireUndoWhitelistButtons(): void {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(".wmeph-row-undo-whitelist")
+  );
+
+  if (buttons.length === 0) {
+    return;
+  }
+
+  for (const button of buttons) {
+    button.onclick = () => {
+      const latest = getLatestAnalysisState();
+
+      if (!latest?.isVenueSelection) {
+        logger.warn("Undo whitelist clicked, but no venue analysis state is available");
+        return;
+      }
+
+      const groupKey = button.dataset.groupKey;
+
+      if (!groupKey) {
+        logger.warn("Undo whitelist clicked without an issue-group key");
+        return;
+      }
+
+      const canceledAction = cancelPendingWhitelistAction({
+        venueId: latest.venueId,
+        groupKey
+      });
+
+      if (!canceledAction) {
+        logger.warn(`Pending whitelist group not found: ${groupKey}`);
+        return;
+      }
+
+      renderLatestVenueAnalysis();
     };
   }
 }
@@ -1460,6 +1678,8 @@ export async function startApplication(): Promise<void> {
     lastStatus: t("status.ready"),
     highlightsEnabled: true,
     autoScanVisibleVenues: runtimeSettings?.autoScanVisibleVenues ?? true,
+    disableNaturalFeaturesHighlighting:
+      runtimeSettings?.disableNaturalFeaturesHighlighting ?? false,
     ...buildGoogleMapsValidationSidebarState()
   });
 

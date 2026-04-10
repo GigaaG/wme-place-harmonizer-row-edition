@@ -100,6 +100,14 @@ runTest("keeps presence and format validation independent", () => {
   );
 });
 
+runTest("treats optional phone presence as neutral", () => {
+  assert.deepEqual(getPhoneIssueRuleIds(undefined, { phone: "optional" }), []);
+  assert.deepEqual(
+    getPhoneIssueRuleIds("+31 20 1234567", { phone: "optional" }),
+    []
+  );
+});
+
 runTest("creates applyable phone-format proposals for normalizable numbers", () => {
   const issue = getPhoneFormatIssue("020-1234567");
 

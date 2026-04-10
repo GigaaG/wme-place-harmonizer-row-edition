@@ -204,17 +204,19 @@ function renderProposal(
     `;
   }
 
-  if (proposal.isApplySupported && renderApplyControl) {
-    html += `
-      <label style="display:block;margin-top:6px;">
-        <input
-          type="checkbox"
-          class="wmeph-row-apply-checkbox"
-          data-proposal-id="${escapeHtml(proposal.id ?? "")}"
-        />
-        ${escapeHtml(t("featureEditor.applyThisFix"))}
-      </label>
-    `;
+  if (proposal.isApplySupported) {
+    if (renderApplyControl) {
+      html += `
+        <label style="display:block;margin-top:6px;">
+          <input
+            type="checkbox"
+            class="wmeph-row-apply-checkbox"
+            data-proposal-id="${escapeHtml(proposal.id ?? "")}"
+          />
+          ${escapeHtml(t("featureEditor.applyThisFix"))}
+        </label>
+      `;
+    }
   } else {
     const manualText =
       proposal.actionType === "manual-only"

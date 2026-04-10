@@ -112,6 +112,16 @@ runTest("renders ignore as a compact inline action", () => {
   assert.equal(html.includes("background:none;border:none;padding:0"), true);
 });
 
+runTest("does not show unavailable text when a single fix is rendered in the footer", () => {
+  const html = renderAnalysisHtml({
+    issues: [buildIssue()],
+    proposals: [buildProposal()]
+  });
+
+  assert.equal(html.includes("This suggestion cannot be auto-applied yet"), false);
+  assert.equal(html.includes("This requires a manual adjustment"), false);
+});
+
 runTest("renders pending ignore with compact status and countdown", () => {
   const html = renderAnalysisHtml({
     issues: [buildIssue()],

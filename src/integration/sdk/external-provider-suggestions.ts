@@ -9,10 +9,12 @@ import { t } from "../../i18n/runtime.ts";
 
 const MAX_EXTERNAL_PROVIDER_SUGGESTIONS = 5;
 const MIN_NAME_SCORE = 0.55;
-// Keep Google suggestions tightly local so nearby-name matches from other cities
-// do not surface as proposals for venues without an external provider.
-const MAX_SUGGESTION_DISTANCE_METERS = 300;
-const ABSOLUTE_MAX_SUGGESTION_DISTANCE_METERS = 300;
+const MIN_MOVED_FALLBACK_NAME_SCORE = 0.84;
+// Keep suggestions local enough to avoid cross-city matches, but wide enough to
+// still catch the correct provider for venues whose centroid is not right on top
+// of the Google Place.
+const MAX_SUGGESTION_DISTANCE_METERS = 500;
+const MOVED_FALLBACK_DISTANCE_METERS = 15000;
 
 interface SearchOrigin {
   lon: number;
@@ -27,52 +29,22 @@ export interface ExternalProviderCandidate {
   sortIndex?: number;
 }
 
-function tokenizeAddress(value: string | undefined): string[] {
-  if (!value) {
-    return [];
-  }
-
-  return normalizeText(value)
-    .split(" ")
-    .filter((token) => token.length >= 2);
+interface CategoryGoogleTypeRule {
+  search?: readonly string[];
+  validation?: readonly string[];
 }
 
-export function filterEditorCandidatesByVenueAddress(
-  venueAddress: { city?: string } | undefined,
-  candidates: ExternalProviderCandidate[]
-): ExternalProviderCandidate[] {
-  if (candidates.length === 0) {
-    return candidates;
-  }
-
-  const cityTokens = tokenizeAddress(venueAddress?.city);
-
-  if (cityTokens.length === 0) {
-    return candidates;
-  }
-
-  const filtered = candidates.filter((candidate) => {
-    const localityTokens = new Set([
-      ...tokenizeAddress(candidate.name),
-      ...tokenizeAddress(candidate.address)
-    ]);
-
-    if (localityTokens.size === 0) {
-      return false;
-    }
-
-    return cityTokens.every((token) => localityTokens.has(token));
-  });
-
-  return filtered.length > 0 ? filtered : candidates;
+function rule(
+  search: readonly string[],
+  validation?: readonly string[]
+): CategoryGoogleTypeRule {
+  return validation ? { search, validation } : { search };
 }
 
-// Uses the legacy PlacesService nearbySearch `type` filter, so values must be
-// valid Google Maps JavaScript place-search types.
-export const CATEGORY_GOOGLE_PLACE_TYPE_MAP: Record<string, readonly string[]> = {
-  CAR_SERVICES: ["car_repair", "car_wash", "gas_station"],
-  CRISIS_LOCATIONS: ["lodging", "local_government_office"],
-  CULTURE_AND_ENTERTAINEMENT: [
+const CATEGORY_GOOGLE_TYPE_RULES: Record<string, CategoryGoogleTypeRule> = {
+  CAR_SERVICES: rule(["car_repair", "car_wash", "gas_station"]),
+  CRISIS_LOCATIONS: rule(["lodging", "local_government_office"]),
+  CULTURE_AND_ENTERTAINEMENT: rule([
     "tourist_attraction",
     "museum",
     "movie_theater",
@@ -83,14 +55,14 @@ export const CATEGORY_GOOGLE_PLACE_TYPE_MAP: Record<string, readonly string[]> =
     "zoo",
     "aquarium",
     "casino"
-  ],
-  FOOD_AND_DRINK: ["restaurant", "cafe", "bar", "bakery"],
-  LODGING: ["lodging", "campground", "rv_park"],
-  NATURAL_FEATURES: ["park", "tourist_attraction"],
-  OTHER: [],
-  OUTDOORS: ["park", "tourist_attraction", "stadium"],
-  PARKING_LOT: ["parking"],
-  PROFESSIONAL_AND_PUBLIC: [
+  ]),
+  FOOD_AND_DRINK: rule(["restaurant", "cafe", "bar", "bakery"], ["restaurant", "cafe", "bar", "bakery", "meal_takeaway", "meal_delivery", "food"]),
+  LODGING: rule(["lodging", "campground", "rv_park"]),
+  NATURAL_FEATURES: rule(["park", "tourist_attraction"]),
+  OTHER: rule([]),
+  OUTDOORS: rule(["park", "tourist_attraction", "stadium"]),
+  PARKING_LOT: rule(["parking"]),
+  PROFESSIONAL_AND_PUBLIC: rule([
     "school",
     "university",
     "hospital",
@@ -103,216 +75,160 @@ export const CATEGORY_GOOGLE_PLACE_TYPE_MAP: Record<string, readonly string[]> =
     "embassy",
     "local_government_office",
     "cemetery"
-  ],
-  SHOPPING_AND_SERVICES: [
-    "store",
-    "supermarket",
-    "shopping_mall",
-    "bank",
-    "atm",
-    "pharmacy"
-  ],
-  TRANSPORTATION: [
-    "airport",
-    "bus_station",
-    "train_station",
-    "subway_station",
-    "transit_station",
-    "taxi_stand",
-    "parking"
-  ],
-  CAR_WASH: ["car_wash"],
-  CHARGING_STATION: [],
-  GARAGE_AUTOMOTIVE_SHOP: ["car_repair"],
-  GAS_STATION: ["gas_station"],
-  DONATION_CENTERS: [],
-  SHELTER_LOCATIONS: ["lodging"],
-  ART_GALLERY: ["art_gallery"],
-  CASINO: ["casino"],
-  CLUB: ["night_club"],
-  TOURIST_ATTRACTION_HISTORIC_SITE: ["tourist_attraction"],
-  MOVIE_THEATER: ["movie_theater"],
-  MUSEUM: ["museum"],
-  MUSIC_VENUE: ["night_club", "stadium"],
-  PERFORMING_ARTS_VENUE: ["tourist_attraction", "movie_theater"],
-  GAME_CLUB: ["bowling_alley", "night_club"],
-  STADIUM_ARENA: ["stadium"],
-  THEME_PARK: ["amusement_park"],
-  ZOO_AQUARIUM: ["zoo", "aquarium"],
-  RACING_TRACK: ["stadium"],
-  THEATER: ["movie_theater", "tourist_attraction"],
-  RESTAURANT: ["restaurant"],
-  BAKERY: ["bakery"],
-  DESSERT: ["bakery", "cafe"],
-  CAFE: ["cafe"],
-  FAST_FOOD: ["restaurant", "meal_takeaway"],
-  FOOD_COURT: ["restaurant", "meal_takeaway"],
-  BAR: ["bar"],
-  ICE_CREAM: ["cafe", "bakery"],
-  HOTEL: ["lodging"],
-  HOSTEL: ["lodging"],
-  CAMPING_TRAILER_PARK: ["campground", "rv_park"],
-  COTTAGE_CABIN: ["lodging"],
-  BED_AND_BREAKFAST: ["lodging"],
-  ISLAND: ["tourist_attraction", "park"],
-  SEA_LAKE_POOL: ["tourist_attraction", "park"],
-  RIVER_STREAM: ["tourist_attraction", "park"],
-  FOREST_GROVE: ["park"],
-  FARM: ["tourist_attraction"],
-  CANAL: ["tourist_attraction", "park"],
-  SWAMP_MARSH: ["tourist_attraction", "park"],
-  DAM: ["tourist_attraction"],
-  CONSTRUCTION_SITE: [],
-  PARK: ["park"],
-  PLAYGROUND: ["park"],
-  BEACH: ["tourist_attraction", "park"],
-  SPORTS_COURT: ["stadium"],
-  GOLF_COURSE: ["park", "stadium"],
-  PLAZA: ["tourist_attraction", "park"],
-  PROMENADE: ["tourist_attraction", "park"],
-  POOL: ["gym", "park"],
-  SCENIC_LOOKOUT_VIEWPOINT: ["tourist_attraction", "park"],
-  SKI_AREA: ["tourist_attraction", "park"],
-  COLLEGE_UNIVERSITY: ["university"],
-  SCHOOL: ["school"],
-  CONVENTIONS_EVENT_CENTER: ["stadium", "tourist_attraction"],
-  GOVERNMENT: ["local_government_office"],
-  LIBRARY: ["library"],
-  CITY_HALL: ["city_hall"],
-  ORGANIZATION_OR_ASSOCIATION: [],
-  PRISON_CORRECTIONAL_FACILITY: [],
-  COURTHOUSE: ["courthouse"],
-  CEMETERY: ["cemetery"],
-  FIRE_DEPARTMENT: ["fire_station"],
-  POLICE_STATION: ["police"],
-  MILITARY: [],
-  HOSPITAL_URGENT_CARE: ["hospital"],
-  DOCTOR_CLINIC: ["doctor"],
-  OFFICES: [],
-  POST_OFFICE: ["post_office"],
-  RELIGIOUS_CENTER: ["church", "mosque", "synagogue", "hindu_temple"],
-  KINDERGARDEN: ["primary_school", "school"],
-  FACTORY_INDUSTRIAL: [],
-  EMBASSY_CONSULATE: ["embassy"],
-  INFORMATION_POINT: ["tourist_attraction"],
-  EMERGENCY_SHELTER: ["lodging"],
-  TRASH_AND_RECYCLING_FACILITIES: [],
-  ARTS_AND_CRAFTS: ["store"],
-  BANK_FINANCIAL: ["bank"],
-  SPORTING_GOODS: ["store"],
-  BOOKSTORE: ["book_store"],
-  PHOTOGRAPHY: ["store"],
-  CAR_DEALERSHIP: ["car_dealer"],
-  FASHION_AND_CLOTHING: ["clothing_store"],
-  CONVENIENCE_STORE: ["convenience_store"],
-  PERSONAL_CARE: ["beauty_salon", "hair_care", "spa"],
-  DEPARTMENT_STORE: ["department_store"],
-  PHARMACY: ["pharmacy"],
-  ELECTRONICS: ["electronics_store"],
-  FLOWERS: ["florist"],
-  FURNITURE_HOME_STORE: ["furniture_store", "home_goods_store"],
-  GIFTS: ["store"],
-  GYM_FITNESS: ["gym"],
-  SWIMMING_POOL: ["gym", "park"],
-  HARDWARE_STORE: ["hardware_store"],
-  MARKET: ["supermarket", "store"],
-  SUPERMARKET_GROCERY: ["supermarket"],
-  JEWELRY: ["jewelry_store"],
-  LAUNDRY_DRY_CLEAN: ["laundry"],
-  SHOPPING_CENTER: ["shopping_mall"],
-  MUSIC_STORE: ["store"],
-  PET_STORE_VETERINARIAN_SERVICES: ["pet_store", "veterinary_care"],
-  TOY_STORE: ["store"],
-  TRAVEL_AGENCY: ["travel_agency"],
-  ATM: ["atm"],
-  CURRENCY_EXCHANGE: ["bank", "atm"],
-  CAR_RENTAL: ["car_rental"],
-  TELECOM: ["store"],
-  AIRPORT: ["airport"],
-  BUS_STATION: ["bus_station"],
-  FERRY_PIER: ["transit_station"],
-  SEAPORT_MARINA_HARBOR: ["tourist_attraction", "transit_station"],
-  SUBWAY_STATION: ["subway_station"],
-  TRAIN_STATION: ["train_station"],
-  BRIDGE: ["tourist_attraction"],
-  TUNNEL: [],
-  TAXI_STATION: ["taxi_stand"],
-  JUNCTION_INTERCHANGE: [],
-  REST_AREAS: ["parking"],
-  CARPOOL_SPOT: ["parking"],
-  RESIDENTIAL: [],
-  FOREST: ["park"],
-  HOSPITAL_MEDICAL_CARE: ["hospital"],
-  UNIVERSITY: ["university"]
+  ]),
+  SHOPPING_AND_SERVICES: rule(
+    ["store", "supermarket", "shopping_mall", "bank", "atm", "pharmacy"],
+    ["store", "supermarket", "shopping_mall", "bank", "atm", "pharmacy", "convenience_store", "department_store"]
+  ),
+  TRANSPORTATION: rule(
+    ["airport", "bus_station", "train_station", "subway_station", "transit_station", "taxi_stand", "parking"],
+    ["airport", "bus_station", "train_station", "subway_station", "transit_station", "taxi_stand", "parking"]
+  ),
+  CAR_WASH: rule(["car_wash"]),
+  CHARGING_STATION: rule([]),
+  GARAGE_AUTOMOTIVE_SHOP: rule(["car_repair"]),
+  GAS_STATION: rule(["gas_station"]),
+  DONATION_CENTERS: rule([]),
+  SHELTER_LOCATIONS: rule(["lodging"]),
+  ART_GALLERY: rule(["art_gallery"]),
+  CASINO: rule(["casino"]),
+  CLUB: rule(["night_club"]),
+  TOURIST_ATTRACTION_HISTORIC_SITE: rule(["tourist_attraction"], ["tourist_attraction", "museum"]),
+  MOVIE_THEATER: rule(["movie_theater"]),
+  MUSEUM: rule(["museum"]),
+  MUSIC_VENUE: rule(["night_club", "stadium"], ["night_club", "stadium", "bar"]),
+  PERFORMING_ARTS_VENUE: rule(["tourist_attraction", "movie_theater"], ["tourist_attraction", "movie_theater", "stadium"]),
+  GAME_CLUB: rule(["bowling_alley", "night_club"]),
+  STADIUM_ARENA: rule(["stadium"], ["stadium", "sports_complex"]),
+  THEME_PARK: rule(["amusement_park"]),
+  ZOO_AQUARIUM: rule(["zoo", "aquarium"]),
+  RACING_TRACK: rule(["stadium"]),
+  THEATER: rule(["movie_theater", "tourist_attraction"]),
+  RESTAURANT: rule(["restaurant"], ["restaurant", "meal_takeaway", "meal_delivery", "food"]),
+  BAKERY: rule(["bakery"], ["bakery", "cafe", "food", "store"]),
+  DESSERT: rule(["bakery", "cafe"], ["bakery", "cafe", "food", "store"]),
+  CAFE: rule(["cafe"], ["cafe", "restaurant", "bakery", "food"]),
+  FAST_FOOD: rule(["restaurant", "meal_takeaway"], ["restaurant", "meal_takeaway", "meal_delivery", "cafe", "food"]),
+  FOOD_COURT: rule(["restaurant", "meal_takeaway"], ["restaurant", "meal_takeaway", "meal_delivery", "cafe", "food"]),
+  BAR: rule(["bar"], ["bar", "restaurant", "food"]),
+  ICE_CREAM: rule(["cafe", "bakery"], ["cafe", "bakery", "food", "store"]),
+  HOTEL: rule(["lodging"]),
+  HOSTEL: rule(["lodging"]),
+  CAMPING_TRAILER_PARK: rule(["campground", "rv_park"], ["campground", "rv_park", "lodging"]),
+  COTTAGE_CABIN: rule(["lodging"]),
+  BED_AND_BREAKFAST: rule(["lodging"]),
+  ISLAND: rule(["tourist_attraction", "park"]),
+  SEA_LAKE_POOL: rule(["tourist_attraction", "park"]),
+  RIVER_STREAM: rule(["tourist_attraction", "park"]),
+  FOREST_GROVE: rule(["park"]),
+  FARM: rule(["tourist_attraction"]),
+  CANAL: rule(["tourist_attraction", "park"]),
+  SWAMP_MARSH: rule(["tourist_attraction", "park"]),
+  DAM: rule(["tourist_attraction"]),
+  CONSTRUCTION_SITE: rule([]),
+  PARK: rule(["park"], ["park", "tourist_attraction"]),
+  PLAYGROUND: rule(["park"]),
+  BEACH: rule(["tourist_attraction", "park"]),
+  SPORTS_COURT: rule(["stadium"]),
+  GOLF_COURSE: rule(["park", "stadium"]),
+  PLAZA: rule(["tourist_attraction", "park"]),
+  PROMENADE: rule(["tourist_attraction", "park"]),
+  POOL: rule(["gym", "park"]),
+  SCENIC_LOOKOUT_VIEWPOINT: rule(["tourist_attraction", "park"]),
+  SKI_AREA: rule(["tourist_attraction", "park"]),
+  COLLEGE_UNIVERSITY: rule(["university"], ["university", "school"]),
+  SCHOOL: rule(["school"]),
+  CONVENTIONS_EVENT_CENTER: rule(["stadium", "tourist_attraction"], ["stadium", "tourist_attraction"]),
+  GOVERNMENT: rule(["local_government_office"]),
+  LIBRARY: rule(["library"]),
+  CITY_HALL: rule(["city_hall"]),
+  ORGANIZATION_OR_ASSOCIATION: rule([]),
+  PRISON_CORRECTIONAL_FACILITY: rule([]),
+  COURTHOUSE: rule(["courthouse"]),
+  CEMETERY: rule(["cemetery"]),
+  FIRE_DEPARTMENT: rule(["fire_station"]),
+  POLICE_STATION: rule(["police"]),
+  MILITARY: rule([]),
+  HOSPITAL_URGENT_CARE: rule(["hospital"], ["hospital", "doctor", "health"]),
+  DOCTOR_CLINIC: rule(["doctor"], ["doctor", "hospital", "health"]),
+  OFFICES: rule([]),
+  POST_OFFICE: rule(["post_office"]),
+  RELIGIOUS_CENTER: rule(["church", "mosque", "synagogue", "hindu_temple"]),
+  KINDERGARDEN: rule(["primary_school", "school"], ["primary_school", "school"]),
+  FACTORY_INDUSTRIAL: rule([]),
+  EMBASSY_CONSULATE: rule(["embassy"]),
+  INFORMATION_POINT: rule(["tourist_attraction"]),
+  EMERGENCY_SHELTER: rule(["lodging"]),
+  TRASH_AND_RECYCLING_FACILITIES: rule([]),
+  ARTS_AND_CRAFTS: rule(["store"]),
+  BANK_FINANCIAL: rule(["bank"]),
+  SPORTING_GOODS: rule(["store"]),
+  BOOKSTORE: rule(["book_store"], ["book_store", "store"]),
+  PHOTOGRAPHY: rule(["store"]),
+  CAR_DEALERSHIP: rule(["car_dealer"]),
+  FASHION_AND_CLOTHING: rule(["clothing_store"], ["clothing_store", "store"]),
+  CONVENIENCE_STORE: rule(["convenience_store"], ["convenience_store", "store", "food"]),
+  PERSONAL_CARE: rule(["beauty_salon", "hair_care", "spa"], ["beauty_salon", "hair_care", "spa", "store"]),
+  DEPARTMENT_STORE: rule(["department_store"], ["department_store", "store", "shopping_mall"]),
+  PHARMACY: rule(["pharmacy"]),
+  ELECTRONICS: rule(["electronics_store"], ["electronics_store", "store"]),
+  FLOWERS: rule(["florist"]),
+  FURNITURE_HOME_STORE: rule(["furniture_store", "home_goods_store"], ["furniture_store", "home_goods_store", "store"]),
+  GIFTS: rule(["store"]),
+  GYM_FITNESS: rule(["gym"], ["gym", "health", "spa"]),
+  SWIMMING_POOL: rule(["gym", "park"], ["gym", "park", "sports_complex"]),
+  HARDWARE_STORE: rule(["hardware_store"], ["hardware_store", "store"]),
+  MARKET: rule(["supermarket", "store"], ["supermarket", "store", "grocery_or_supermarket"]),
+  SUPERMARKET_GROCERY: rule(["supermarket"], ["supermarket", "grocery_or_supermarket", "store"]),
+  JEWELRY: rule(["jewelry_store"], ["jewelry_store", "store"]),
+  LAUNDRY_DRY_CLEAN: rule(["laundry"], ["laundry", "store"]),
+  SHOPPING_CENTER: rule(["shopping_mall"]),
+  MUSIC_STORE: rule(["store"]),
+  PET_STORE_VETERINARIAN_SERVICES: rule(["pet_store", "veterinary_care"], ["pet_store", "veterinary_care", "store"]),
+  TOY_STORE: rule(["store"]),
+  TRAVEL_AGENCY: rule(["travel_agency"]),
+  ATM: rule(["atm"]),
+  CURRENCY_EXCHANGE: rule(["bank", "atm"]),
+  CAR_RENTAL: rule(["car_rental"]),
+  TELECOM: rule(["store"]),
+  AIRPORT: rule(["airport"]),
+  BUS_STATION: rule(["bus_station"], ["bus_station", "transit_station"]),
+  FERRY_PIER: rule(["transit_station"]),
+  SEAPORT_MARINA_HARBOR: rule(["tourist_attraction", "transit_station"], ["transit_station", "tourist_attraction"]),
+  SUBWAY_STATION: rule(["subway_station"], ["subway_station", "transit_station"]),
+  TRAIN_STATION: rule(["train_station"], ["train_station", "transit_station"]),
+  BRIDGE: rule(["tourist_attraction"]),
+  TUNNEL: rule([]),
+  TAXI_STATION: rule(["taxi_stand"], ["taxi_stand", "transit_station"]),
+  JUNCTION_INTERCHANGE: rule([]),
+  REST_AREAS: rule(["parking"]),
+  CARPOOL_SPOT: rule(["parking"]),
+  RESIDENTIAL: rule([]),
+  FOREST: rule(["park"]),
+  HOSPITAL_MEDICAL_CARE: rule(["hospital"], ["hospital", "doctor", "health"]),
+  UNIVERSITY: rule(["university"])
 };
+
+// Uses the legacy PlacesService nearbySearch `type` filter, so values must be
+// valid Google Maps JavaScript place-search types.
+export const CATEGORY_GOOGLE_PLACE_TYPE_MAP: Record<string, readonly string[]> =
+  Object.fromEntries(
+    Object.entries(CATEGORY_GOOGLE_TYPE_RULES).map(([category, rule]) => [
+      category,
+      rule.search ?? []
+    ])
+  );
 
 // Validation can accept a broader set of Google Place details types than
 // nearbySearch supports as a `type` filter. Keep search strict and validation
 // tolerant so linked-place checks do not over-report on Google's coarse typing.
-export const CATEGORY_GOOGLE_VALIDATION_TYPE_MAP: Record<string, readonly string[]> = {
-  ...CATEGORY_GOOGLE_PLACE_TYPE_MAP,
-  FOOD_AND_DRINK: ["restaurant", "cafe", "bar", "bakery", "meal_takeaway", "meal_delivery", "food"],
-  SHOPPING_AND_SERVICES: ["store", "supermarket", "shopping_mall", "bank", "atm", "pharmacy", "convenience_store", "department_store"],
-  TRANSPORTATION: ["airport", "bus_station", "train_station", "subway_station", "transit_station", "taxi_stand", "parking"],
-  FAST_FOOD: ["restaurant", "meal_takeaway", "meal_delivery", "cafe", "food"],
-  FOOD_COURT: ["restaurant", "meal_takeaway", "meal_delivery", "cafe", "food"],
-  CAFE: ["cafe", "restaurant", "bakery", "food"],
-  RESTAURANT: ["restaurant", "meal_takeaway", "meal_delivery", "food"],
-  BAKERY: ["bakery", "cafe", "food", "store"],
-  DESSERT: ["bakery", "cafe", "food", "store"],
-  BAR: ["bar", "restaurant", "food"],
-  ICE_CREAM: ["cafe", "bakery", "food", "store"],
-  MARKET: ["supermarket", "store", "grocery_or_supermarket"],
-  SUPERMARKET_GROCERY: ["supermarket", "grocery_or_supermarket", "store"],
-  CONVENIENCE_STORE: ["convenience_store", "store", "food"],
-  DEPARTMENT_STORE: ["department_store", "store", "shopping_mall"],
-  BOOKSTORE: ["book_store", "store"],
-  FASHION_AND_CLOTHING: ["clothing_store", "store"],
-  ELECTRONICS: ["electronics_store", "store"],
-  FURNITURE_HOME_STORE: ["furniture_store", "home_goods_store", "store"],
-  HARDWARE_STORE: ["hardware_store", "store"],
-  JEWELRY: ["jewelry_store", "store"],
-  MUSIC_STORE: ["store"],
-  TOY_STORE: ["store"],
-  GIFTS: ["store"],
-  ARTS_AND_CRAFTS: ["store"],
-  PHOTOGRAPHY: ["store"],
-  SPORTING_GOODS: ["store"],
-  TELECOM: ["store"],
-  PERSONAL_CARE: ["beauty_salon", "hair_care", "spa", "store"],
-  LAUNDRY_DRY_CLEAN: ["laundry", "store"],
-  PET_STORE_VETERINARIAN_SERVICES: ["pet_store", "veterinary_care", "store"],
-  GYM_FITNESS: ["gym", "health", "spa"],
-  SWIMMING_POOL: ["gym", "park", "sports_complex"],
-  TRAIN_STATION: ["train_station", "transit_station"],
-  SUBWAY_STATION: ["subway_station", "transit_station"],
-  BUS_STATION: ["bus_station", "transit_station"],
-  FERRY_PIER: ["transit_station"],
-  SEAPORT_MARINA_HARBOR: ["transit_station", "tourist_attraction"],
-  TAXI_STATION: ["taxi_stand", "transit_station"],
-  PARK: ["park", "tourist_attraction"],
-  PLAYGROUND: ["park"],
-  BEACH: ["tourist_attraction", "park"],
-  PLAZA: ["tourist_attraction", "park"],
-  PROMENADE: ["tourist_attraction", "park"],
-  SCENIC_LOOKOUT_VIEWPOINT: ["tourist_attraction", "park"],
-  TOURIST_ATTRACTION_HISTORIC_SITE: ["tourist_attraction", "museum"],
-  PERFORMING_ARTS_VENUE: ["tourist_attraction", "movie_theater", "stadium"],
-  MUSIC_VENUE: ["night_club", "stadium", "bar"],
-  STADIUM_ARENA: ["stadium", "sports_complex"],
-  CONVENTIONS_EVENT_CENTER: ["stadium", "tourist_attraction"],
-  HOTEL: ["lodging"],
-  HOSTEL: ["lodging"],
-  BED_AND_BREAKFAST: ["lodging"],
-  CAMPING_TRAILER_PARK: ["campground", "rv_park", "lodging"],
-  COTTAGE_CABIN: ["lodging"],
-  DOCTOR_CLINIC: ["doctor", "hospital", "health"],
-  HOSPITAL_URGENT_CARE: ["hospital", "doctor", "health"],
-  HOSPITAL_MEDICAL_CARE: ["hospital", "doctor", "health"],
-  KINDERGARDEN: ["primary_school", "school"],
-  COLLEGE_UNIVERSITY: ["university", "school"],
-  RELIGIOUS_CENTER: ["church", "mosque", "synagogue", "hindu_temple"]
-};
+export const CATEGORY_GOOGLE_VALIDATION_TYPE_MAP: Record<string, readonly string[]> =
+  Object.fromEntries(
+    Object.entries(CATEGORY_GOOGLE_TYPE_RULES).map(([category, rule]) => [
+      category,
+      rule.validation ?? rule.search ?? []
+    ])
+  );
 
 let placesServiceContainer: HTMLDivElement | null = null;
 
@@ -532,15 +448,25 @@ export function scoreExternalProviderName(
   return Math.min(0.89, queryCoverage * 0.7 + candidateCoverage * 0.2 + 0.1);
 }
 
-export function rankExternalProviderSuggestions(
-  query: string,
-  origin: SearchOrigin,
-  candidates: ExternalProviderCandidate[]
-): ExternalProviderSuggestion[] {
+interface SuggestionCandidateContext {
+  candidate: ExternalProviderCandidate;
+  providerId: string;
+  name: string;
+  distanceMeters?: number;
+  nameScore: number;
+}
+
+function buildSuggestionCandidates(params: {
+  candidates: ExternalProviderCandidate[];
+  origin: SearchOrigin;
+  getNameScore: (name: string) => number;
+  shouldInclude: (context: SuggestionCandidateContext) => boolean;
+  reasonVariant?: ExternalProviderSuggestion["reasonVariant"];
+}): ExternalProviderSuggestion[] {
   const seenProviderIds = new Set<string>();
   const suggestions: ExternalProviderSuggestion[] = [];
 
-  for (const candidate of candidates) {
+  for (const candidate of params.candidates) {
     const providerId =
       typeof candidate.providerId === "string" ? candidate.providerId.trim() : "";
     const name = typeof candidate.name === "string" ? candidate.name.trim() : "";
@@ -549,28 +475,19 @@ export function rankExternalProviderSuggestions(
       continue;
     }
 
-    const nameScore = scoreExternalProviderName(query, name);
-
-    if (nameScore < MIN_NAME_SCORE) {
-      continue;
-    }
-
     const distanceMeters = candidate.location
-      ? calculateDistanceMeters(origin, candidate.location)
+      ? calculateDistanceMeters(params.origin, candidate.location)
       : undefined;
+    const nameScore = params.getNameScore(name);
+    const context: SuggestionCandidateContext = {
+      candidate,
+      providerId,
+      name,
+      distanceMeters,
+      nameScore
+    };
 
-    if (
-      typeof distanceMeters === "number" &&
-      distanceMeters > ABSOLUTE_MAX_SUGGESTION_DISTANCE_METERS
-    ) {
-      continue;
-    }
-
-    if (
-      typeof distanceMeters === "number" &&
-      distanceMeters > MAX_SUGGESTION_DISTANCE_METERS &&
-      nameScore < 0.84
-    ) {
+    if (!params.shouldInclude(context)) {
       continue;
     }
 
@@ -581,43 +498,177 @@ export function rankExternalProviderSuggestions(
       address: candidate.address,
       distanceMeters,
       nameScore,
-      sortIndex: candidate.sortIndex
+      sortIndex: candidate.sortIndex,
+      reasonVariant: params.reasonVariant
     });
   }
 
-  return suggestions
-    .sort((left, right) => {
-      if (right.nameScore !== left.nameScore) {
-        return right.nameScore - left.nameScore;
-      }
+  return suggestions;
+}
 
-      if (
-        typeof left.distanceMeters === "number" &&
-        typeof right.distanceMeters === "number" &&
-        left.distanceMeters !== right.distanceMeters
-      ) {
-        return left.distanceMeters - right.distanceMeters;
-      }
-
-      if (typeof left.distanceMeters === "number") {
-        return -1;
-      }
-
-      if (typeof right.distanceMeters === "number") {
-        return 1;
-      }
-
-      if (
-        typeof left.sortIndex === "number" &&
-        typeof right.sortIndex === "number" &&
-        left.sortIndex !== right.sortIndex
-      ) {
-        return left.sortIndex - right.sortIndex;
-      }
-
-      return left.name.localeCompare(right.name);
-    })
+function sortSuggestions(
+  suggestions: ExternalProviderSuggestion[],
+  compare: (left: ExternalProviderSuggestion, right: ExternalProviderSuggestion) => number
+): ExternalProviderSuggestion[] {
+  return [...suggestions]
+    .sort(compare)
     .slice(0, MAX_EXTERNAL_PROVIDER_SUGGESTIONS);
+}
+
+function compareSuggestionsByNameScoreDistance(
+  left: ExternalProviderSuggestion,
+  right: ExternalProviderSuggestion
+): number {
+  if (right.nameScore !== left.nameScore) {
+    return right.nameScore - left.nameScore;
+  }
+
+  if (
+    typeof left.distanceMeters === "number" &&
+    typeof right.distanceMeters === "number" &&
+    left.distanceMeters !== right.distanceMeters
+  ) {
+    return left.distanceMeters - right.distanceMeters;
+  }
+
+  if (typeof left.distanceMeters === "number") {
+    return -1;
+  }
+
+  if (typeof right.distanceMeters === "number") {
+    return 1;
+  }
+
+  if (
+    typeof left.sortIndex === "number" &&
+    typeof right.sortIndex === "number" &&
+    left.sortIndex !== right.sortIndex
+  ) {
+    return left.sortIndex - right.sortIndex;
+  }
+
+  return left.name.localeCompare(right.name);
+}
+
+function compareSuggestionsByDistance(
+  left: ExternalProviderSuggestion,
+  right: ExternalProviderSuggestion
+): number {
+  if (
+    typeof left.distanceMeters === "number" &&
+    typeof right.distanceMeters === "number" &&
+    left.distanceMeters !== right.distanceMeters
+  ) {
+    return left.distanceMeters - right.distanceMeters;
+  }
+
+  return left.name.localeCompare(right.name);
+}
+
+export function rankExternalProviderSuggestions(
+  query: string,
+  origin: SearchOrigin,
+  candidates: ExternalProviderCandidate[]
+): ExternalProviderSuggestion[] {
+  const suggestions = buildSuggestionCandidates({
+    candidates,
+    origin,
+    getNameScore: (name) => scoreExternalProviderName(query, name),
+    shouldInclude: ({ distanceMeters, nameScore }) => {
+      if (nameScore < MIN_NAME_SCORE) {
+        return false;
+      }
+
+      if (
+        typeof distanceMeters === "number" &&
+        distanceMeters > MAX_SUGGESTION_DISTANCE_METERS
+      ) {
+        return false;
+      }
+
+      return true;
+    }
+  });
+
+  return sortSuggestions(suggestions, compareSuggestionsByNameScoreDistance);
+}
+
+export function rankNearbyDistanceFallbackSuggestions(
+  origin: SearchOrigin,
+  candidates: ExternalProviderCandidate[]
+): ExternalProviderSuggestion[] {
+  const suggestions = buildSuggestionCandidates({
+    candidates,
+    origin,
+    getNameScore: (name) => scoreExternalProviderName(name, name),
+    shouldInclude: ({ candidate, distanceMeters }) =>
+      !!candidate.location &&
+      typeof distanceMeters === "number" &&
+      distanceMeters <= MAX_SUGGESTION_DISTANCE_METERS
+  });
+
+  return sortSuggestions(suggestions, compareSuggestionsByDistance);
+}
+
+export function rankMovedExternalProviderSuggestions(
+  query: string,
+  origin: SearchOrigin,
+  candidates: ExternalProviderCandidate[]
+): ExternalProviderSuggestion[] {
+  const suggestions = buildSuggestionCandidates({
+    candidates,
+    origin,
+    getNameScore: (name) => scoreExternalProviderName(query, name),
+    shouldInclude: ({ candidate, distanceMeters, nameScore }) =>
+      !!candidate.location &&
+      nameScore >= MIN_MOVED_FALLBACK_NAME_SCORE &&
+      typeof distanceMeters === "number" &&
+      distanceMeters > MAX_SUGGESTION_DISTANCE_METERS &&
+      distanceMeters <= MOVED_FALLBACK_DISTANCE_METERS,
+    reasonVariant: "likelyMoved"
+  });
+
+  return sortSuggestions(suggestions, compareSuggestionsByDistance);
+}
+
+function mapGoogleResults(results: any[]): ExternalProviderCandidate[] {
+  return results
+    .map((result) => mapGoogleCandidate(result))
+    .filter((candidate): candidate is ExternalProviderCandidate => candidate !== undefined);
+}
+
+function rankSearchResults(params: {
+  query: string;
+  origin: SearchOrigin;
+  results: any[];
+}): ExternalProviderSuggestion[] {
+  return rankExternalProviderSuggestions(
+    params.query,
+    params.origin,
+    mapGoogleResults(params.results)
+  );
+}
+
+async function runAndRankSearch(params: {
+  service: any;
+  googleMaps: any;
+  method: "nearbySearch" | "textSearch";
+  request: Record<string, unknown>;
+  query: string;
+  origin: SearchOrigin;
+}): Promise<ExternalProviderSuggestion[]> {
+  const results = await runPlacesSearch({
+    service: params.service,
+    googleMaps: params.googleMaps,
+    request: params.request,
+    method: params.method
+  });
+
+  return rankSearchResults({
+    query: params.query,
+    origin: params.origin,
+    results
+  });
 }
 
 function mapGoogleCandidate(result: any): ExternalProviderCandidate | undefined {
@@ -653,15 +704,23 @@ function isSuccessfulPlacesStatus(status: unknown, googleMaps: any): boolean {
   );
 }
 
-function runNearbySearch(
-  service: any,
-  googleMaps: any,
-  request: Record<string, unknown>
-): Promise<any[]> {
+function runPlacesSearch(params: {
+  service: any;
+  googleMaps: any;
+  request: Record<string, unknown>;
+  method: "nearbySearch" | "textSearch";
+}): Promise<any[]> {
   return new Promise((resolve) => {
-    service.nearbySearch(request, (results: any[], status: unknown) => {
-      if (!isSuccessfulPlacesStatus(status, googleMaps)) {
-        logger.warn(`External provider nearbySearch failed: ${String(status)}`);
+    const searchMethod = params.service?.[params.method];
+
+    if (typeof searchMethod !== "function") {
+      resolve([]);
+      return;
+    }
+
+    searchMethod.call(params.service, params.request, (results: any[], status: unknown) => {
+      if (!isSuccessfulPlacesStatus(status, params.googleMaps)) {
+        logger.warn(`External provider ${params.method} failed: ${String(status)}`);
         resolve([]);
         return;
       }
@@ -721,12 +780,15 @@ async function runCategoryTypedNearbySearch(params: {
       request.radius = MAX_SUGGESTION_DISTANCE_METERS;
     }
 
-    const results = await runNearbySearch(service, googleMaps, request);
+    const results = await runPlacesSearch({
+      service,
+      googleMaps,
+      request,
+      method: "nearbySearch"
+    });
 
-    for (const result of results) {
-      const candidate = mapGoogleCandidate(result);
-
-      if (!candidate?.providerId || seenProviderIds.has(candidate.providerId)) {
+    for (const candidate of mapGoogleResults(results)) {
+      if (!candidate.providerId || seenProviderIds.has(candidate.providerId)) {
         continue;
       }
 
@@ -738,35 +800,9 @@ async function runCategoryTypedNearbySearch(params: {
   return candidates;
 }
 
-function runTextSearch(
-  service: any,
-  googleMaps: any,
-  request: Record<string, unknown>
-): Promise<any[]> {
-  return new Promise((resolve) => {
-    if (typeof service.textSearch !== "function") {
-      resolve([]);
-      return;
-    }
-
-    service.textSearch(request, (results: any[], status: unknown) => {
-      if (!isSuccessfulPlacesStatus(status, googleMaps)) {
-        logger.warn(`External provider textSearch failed: ${String(status)}`);
-        resolve([]);
-        return;
-      }
-
-      resolve(Array.isArray(results) ? results : []);
-    });
-  });
-}
-
 export async function findSuggestedExternalProviders(
   venue: any,
-  query: string,
-  options?: {
-    venueAddress?: { city?: string };
-  }
+  query: string
 ): Promise<ExternalProviderSuggestion[]> {
   const searchQuery = query.trim();
 
@@ -811,6 +847,16 @@ export async function findSuggestedExternalProviders(
         return typedNearbySuggestions;
       }
 
+      const typedNearbyDistanceFallbackSuggestions =
+        rankNearbyDistanceFallbackSuggestions(origin, typedNearbyCandidates);
+
+      if (typedNearbyDistanceFallbackSuggestions.length > 0) {
+        logger.info(
+          `Found ${typedNearbyDistanceFallbackSuggestions.length} category-typed nearby external provider distance fallback suggestion(s)`
+        );
+        return typedNearbyDistanceFallbackSuggestions;
+      }
+
       const location = new googleMaps.LatLng(origin.lat, origin.lon);
       const nearbySearchRequest: Record<string, unknown> = {
         keyword: searchQuery,
@@ -823,60 +869,84 @@ export async function findSuggestedExternalProviders(
         nearbySearchRequest.radius = MAX_SUGGESTION_DISTANCE_METERS;
       }
 
-      const nearbyResults = await runNearbySearch(
+      const nearbySuggestions = await runAndRankSearch({
         service,
         googleMaps,
-        nearbySearchRequest
-      );
-      const nearbyCandidates = nearbyResults
-        .map((result) => mapGoogleCandidate(result))
-        .filter((candidate): candidate is ExternalProviderCandidate => candidate !== undefined);
-      const nearbySuggestions = rankExternalProviderSuggestions(
-        searchQuery,
-        origin,
-        nearbyCandidates
-      );
+        method: "nearbySearch",
+        request: nearbySearchRequest,
+        query: searchQuery,
+        origin
+      });
 
       if (nearbySuggestions.length > 0) {
         return nearbySuggestions;
       }
 
-      const textResults = await runTextSearch(service, googleMaps, {
+      const textSuggestions = await runAndRankSearch({
+        service,
+        googleMaps,
+        method: "textSearch",
+        request: {
+          query: searchQuery,
+          location,
+          radius: MAX_SUGGESTION_DISTANCE_METERS
+        },
         query: searchQuery,
-        location,
-        radius: MAX_SUGGESTION_DISTANCE_METERS
+        origin
       });
-      const textCandidates = textResults
-        .map((result) => mapGoogleCandidate(result))
-        .filter((candidate): candidate is ExternalProviderCandidate => candidate !== undefined);
-      const textSuggestions = rankExternalProviderSuggestions(
-        searchQuery,
-        origin,
-        textCandidates
-      );
 
       if (textSuggestions.length > 0) {
         return textSuggestions;
+      }
+
+      const movedFallbackResults = await runPlacesSearch({
+        service,
+        googleMaps,
+        method: "textSearch",
+        request: {
+          query: searchQuery,
+          location,
+          radius: MOVED_FALLBACK_DISTANCE_METERS
+        }
+      });
+      const movedFallbackSuggestions = rankMovedExternalProviderSuggestions(
+        searchQuery,
+        origin,
+        mapGoogleResults(movedFallbackResults)
+      );
+
+      if (movedFallbackSuggestions.length > 0) {
+        logger.info(
+          `Found ${movedFallbackSuggestions.length} likely-moved external provider suggestion(s)`
+        );
+        return movedFallbackSuggestions;
       }
     } else {
       logger.warn("Cannot initialize Google Places container for external provider suggestions");
     }
   } else {
-    logger.info("Google Places service unavailable on host window; falling back to editor autocomplete suggestions");
+    logger.info(
+      "Google Places service unavailable on host window; falling back to editor autocomplete suggestions"
+    );
+
+    const editorCandidates = await findExternalProviderEditorCandidates(searchQuery);
+    return rankExternalProviderSuggestions(
+      searchQuery,
+      origin,
+      editorCandidates
+    );
   }
 
-  const editorCandidates = filterEditorCandidatesByVenueAddress(
-    options?.venueAddress,
-    await findExternalProviderEditorCandidates(searchQuery)
-  );
-  return rankExternalProviderSuggestions(
-    searchQuery,
-    origin,
-    editorCandidates
-  );
+  return [];
 }
 
 function buildSuggestionReason(suggestion: ExternalProviderSuggestion): string {
+  if (suggestion.reasonVariant === "likelyMoved") {
+    return t("proposal.externalProvider.reason.likelyMoved", {
+      distanceMeters: suggestion.distanceMeters ?? 0
+    });
+  }
+
   const details: string[] = [];
 
   if (suggestion.address) {

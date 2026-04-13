@@ -7,7 +7,8 @@ import {
   buildExternalProviderSuggestionProposals,
   CATEGORY_GOOGLE_PLACE_TYPE_MAP,
   CATEGORY_GOOGLE_VALIDATION_TYPE_MAP,
-  filterEditorCandidatesByVenueAddress,
+  rankMovedExternalProviderSuggestions,
+  rankNearbyDistanceFallbackSuggestions,
   rankExternalProviderSuggestions,
   resolveNearbySearchTypes,
   scoreExternalProviderName
@@ -201,7 +202,7 @@ runTest("filters out exact-name Google matches outside the local search radius",
         providerId: "too-far",
         name: "Albert Heijn",
         address: "Address 2",
-        location: { lon: 4.907, lat: 52.37 }
+        location: { lon: 4.908, lat: 52.37 }
       }
     ]
   );
@@ -212,73 +213,88 @@ runTest("filters out exact-name Google matches outside the local search radius",
   );
 });
 
-runTest("filters editor autocomplete candidates to the venue city", () => {
-  const candidates = filterEditorCandidatesByVenueAddress(
-    { city: "Alkmaar" },
+runTest("keeps exact-name Google matches within five hundred meters", () => {
+  const suggestions = rankExternalProviderSuggestions(
+    "Albert Heijn",
+    { lon: 4.9, lat: 52.37 },
     [
       {
-        providerId: "alkmaar",
-        name: "Autotaalglas Alkmaar",
-        address: "Fluorietweg, Alkmaar, Nederland",
-        sortIndex: 0
-      },
-      {
-        providerId: "hoorn",
-        name: "Autotaalglas Hoorn",
-        address: "Oostergouw, Zwaag, Nederland",
-        sortIndex: 1
-      },
-      {
-        providerId: "zaandam",
-        name: "Autotaalglas Zaandam",
-        address: "Pieter Ghijsenlaan, Zaandam, Nederland",
-        sortIndex: 2
+        providerId: "within-range",
+        name: "Albert Heijn",
+        address: "Address 1",
+        location: { lon: 4.906, lat: 52.37 }
       }
     ]
   );
 
   assert.deepEqual(
-    candidates.map((candidate) => candidate.providerId),
-    ["alkmaar"]
+    suggestions.map((suggestion) => suggestion.providerId),
+    ["within-range"]
   );
 });
 
-runTest("matches editor autocomplete candidates when the venue city is only present in the name", () => {
-  const candidates = filterEditorCandidatesByVenueAddress(
-    { city: "Alkmaar" },
+runTest("falls back to nearest typed Google results within five hundred meters", () => {
+  const suggestions = rankNearbyDistanceFallbackSuggestions(
+    { lon: 4.9, lat: 52.37 },
     [
       {
-        providerId: "alkmaar",
-        name: "Autotaalglas Alkmaar",
-        address: "Fluorietweg, Noord-Holland, Nederland",
-        sortIndex: 0
+        providerId: "nearest",
+        name: "Glaspunt Service",
+        address: "Address 1",
+        location: { lon: 4.901, lat: 52.37 }
+      },
+      {
+        providerId: "farther",
+        name: "Autotaalglas Service",
+        address: "Address 2",
+        location: { lon: 4.904, lat: 52.37 }
+      },
+      {
+        providerId: "too-far",
+        name: "Other Service",
+        address: "Address 3",
+        location: { lon: 4.908, lat: 52.37 }
       }
     ]
   );
 
   assert.deepEqual(
-    candidates.map((candidate) => candidate.providerId),
-    ["alkmaar"]
+    suggestions.map((suggestion) => suggestion.providerId),
+    ["nearest", "farther"]
   );
 });
 
-runTest("keeps editor autocomplete candidates when none match the venue city", () => {
-  const candidates = filterEditorCandidatesByVenueAddress(
-    { city: "Alkmaar" },
+runTest("suggests a likely moved provider on a strong farther name match", () => {
+  const suggestions = rankMovedExternalProviderSuggestions(
+    "Autotaalglas Alkmaar",
+    { lon: 4.75, lat: 52.63 },
     [
       {
-        providerId: "hoorn",
-        name: "Autotaalglas Hoorn",
-        address: "Oostergouw, Zwaag, Nederland",
-        sortIndex: 0
+        providerId: "moved",
+        name: "Autotaalglas Alkmaar",
+        address: "Nieuwe locatie",
+        location: { lon: 4.79, lat: 52.63 }
+      },
+      {
+        providerId: "too-far",
+        name: "Autotaalglas Alkmaar",
+        address: "Te ver",
+        location: { lon: 4.98, lat: 52.63 }
+      },
+      {
+        providerId: "weak-name",
+        name: "Glasservice Noord-Holland",
+        address: "Andere naam",
+        location: { lon: 4.79, lat: 52.63 }
       }
     ]
   );
 
   assert.deepEqual(
-    candidates.map((candidate) => candidate.providerId),
-    ["hoorn"]
+    suggestions.map((suggestion) => suggestion.providerId),
+    ["moved"]
   );
+  assert.equal(suggestions[0]?.reasonVariant, "likelyMoved");
 });
 
 runTest("builds applyable proposals for nearby external provider suggestions", () => {
@@ -348,4 +364,25 @@ runTest("adds the top suggestion to the issue message", () => {
     }),
     "At least one external provider id is required. Suggested nearby match: Albert Heijn | Damrak 1"
   );
+});
+
+runTest("uses a likely moved reason for farther strong-name suggestions", () => {
+  const issue: PlaceIssue = {
+    field: "externalProviderIds",
+    severity: "warning",
+    message: "At least one external provider id is required",
+    ruleId: "externalProvider.required"
+  };
+  const proposals = buildExternalProviderSuggestionProposals(issue, [
+    {
+      providerId: "moved-provider",
+      name: "Autotaalglas Alkmaar",
+      address: "Nieuwe locatie",
+      distanceMeters: 4200,
+      nameScore: 1,
+      reasonVariant: "likelyMoved"
+    }
+  ]);
+
+  assert.match(proposals[0].reason, /4200/);
 });

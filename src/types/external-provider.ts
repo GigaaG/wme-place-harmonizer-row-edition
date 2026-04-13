@@ -5,4 +5,5 @@ export interface ExternalProviderSuggestion {
   distanceMeters?: number;
   nameScore: number;
   sortIndex?: number;
+  reasonVariant?: "likelyMoved";
 }

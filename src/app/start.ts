@@ -597,16 +597,12 @@ function removeExternalProviderValidationProposals(
 async function refreshExternalProviderSuggestions(params: {
   requestId: number;
   venue: any;
-  place: any;
   issue: PlaceIssue;
   query: string;
 }): Promise<void> {
   const suggestions = await findSuggestedExternalProviders(
     params.venue,
-    params.query,
-    {
-      venueAddress: params.place?.address
-    }
+    params.query
   );
 
   if (params.requestId !== externalProviderSuggestionRequestId) {
@@ -1588,7 +1584,6 @@ async function analyzeVenue(params: {
     void refreshExternalProviderSuggestions({
       requestId: externalProviderSuggestionRequestId,
       venue,
-      place,
       issue: suggestionIssue,
       query: place.name
     });

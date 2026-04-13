@@ -1,4 +1,4 @@
-import { getWmeSdk } from "./wme";
+import { getWmeSdk } from "./wme.ts";
 
 type BBox = [number, number, number, number];
 interface Bounds {
@@ -124,8 +124,8 @@ export function getVisibleVenues(): any[] {
     return [];
   }
 
-  const extent = sdk.Map.getMapExtent() as BBox;
-  const allVenues = sdk.DataModel.Venues.getAll();
+  const extent = sdk.Map?.getMapExtent?.() as BBox | undefined;
+  const allVenues = sdk.DataModel?.Venues?.getAll?.();
 
   if (!extent || !Array.isArray(allVenues)) {
     return [];

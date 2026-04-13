@@ -1,24 +1,39 @@
 import { logger } from "../../logging/logger.ts";
 
 const CONTAINER_ID = "wmeph-row-feature-editor";
+const FEATURE_EDITOR_SELECTORS = [
+  "#edit-panel > div > div > div > wz-section-header",
+  "#edit-panel wz-section-header"
+];
 
-let retryTimer: number | null = null;
+export function findFeatureEditorAnchor(): Element | null {
+  for (const selector of FEATURE_EDITOR_SELECTORS) {
+    const match = document.querySelector(selector);
 
-function findAnchor(): Element | null {
-  return (
-    document.querySelector("#edit-panel > div > div > div > wz-section-header") ??
-    document.querySelector("#edit-panel wz-section-header")
-  );
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+export function getFeatureEditorContainer(): HTMLElement | null {
+  if (typeof document === "undefined" || typeof document.getElementById !== "function") {
+    return null;
+  }
+
+  return document.getElementById(CONTAINER_ID);
 }
 
 export function ensureFeatureEditorContainer(): HTMLElement | null {
-  let container = document.getElementById(CONTAINER_ID);
+  let container = getFeatureEditorContainer();
 
   if (container) {
     return container;
   }
 
-  const anchor = findAnchor();
+  const anchor = findFeatureEditorAnchor();
 
   if (!anchor) {
     logger.warn("Feature editor header not found");
@@ -40,51 +55,21 @@ export function ensureFeatureEditorContainer(): HTMLElement | null {
 
 export function retryEnsureFeatureEditorContainer(
   shouldContinue: () => boolean,
-  attempts = 10,
-  delayMs = 200
+  _attempts = 10,
+  _delayMs = 200
 ): void {
-  cancelFeatureEditorContainerRetry();
-
-  let remaining = attempts;
-
-  const tryMount = (): void => {
-    if (!shouldContinue()) {
-      logger.info("Feature editor mount retry cancelled because state is no longer valid");
-      return;
-    }
-
-    const container = ensureFeatureEditorContainer();
-
-    if (container) {
-      retryTimer = null;
-      return;
-    }
-
-    remaining -= 1;
-
-    if (remaining <= 0) {
-      logger.warn("Feature editor container could not be mounted after retries");
-      retryTimer = null;
-      return;
-    }
-
-    retryTimer = window.setTimeout(tryMount, delayMs);
-  };
-
-  tryMount();
-}
-
-export function cancelFeatureEditorContainerRetry(): void {
-  if (retryTimer !== null) {
-    window.clearTimeout(retryTimer);
-    retryTimer = null;
+  if (!shouldContinue()) {
+    logger.info("Feature editor mount skipped because state is no longer valid");
+    return;
   }
+
+  ensureFeatureEditorContainer();
 }
+
+export function cancelFeatureEditorContainerRetry(): void {}
 
 export function removeFeatureEditorContainer(): void {
-  cancelFeatureEditorContainerRetry();
-
-  const container = document.getElementById(CONTAINER_ID);
+  const container = getFeatureEditorContainer();
 
   if (container) {
     container.remove();

@@ -7,7 +7,6 @@ import {
   getEffectiveGoogleMapsValidationSettings,
   resolveGoogleMapsValidationAvailability
 } from "../settings/google-maps-validation-policy";
-import { mountSidebarPlaceholder } from "../integration/sdk/sidebar";
 import { loadManifest } from "../config/manifest-loader";
 import { resolveRuntimeConfig } from "../config/runtime-config";
 import { resolveRuntimeChains } from "../config/runtime-chains";
@@ -37,7 +36,6 @@ import {
 } from "./analysis-state";
 import {
   removeFeatureEditorContainer,
-  retryEnsureFeatureEditorContainer
 } from "../ui/feature-editor/container";
 import { generateProposals } from "../proposals/generate-proposals";
 import { getSelectedProposals } from "../ui/feature-editor/actions";
@@ -63,8 +61,7 @@ import { normalizeCountryCode } from "../config/country-code";
 import { DATA_REPOSITORY_BRANCH } from "../config/source";
 import {
   resolveVenueCountryCode,
-  resolveCountryCodeFromCountryEntity,
-  resolveCountryCodeFromCountryId
+  resolveCountryCodeFromCountryEntity
 } from "../integration/sdk/venue-country";
 import type { PlaceIssue } from "../types/issue";
 import {
@@ -162,178 +159,13 @@ function getCountryFromCurrentSelection(): string | undefined {
 
 function getCountryFromVisibleMapContext(): string | undefined {
   const sdk = getWmeSdk();
-  const countries = sdk?.DataModel?.Countries;
   const topCountry = resolveCountryCodeFromCountryEntity(
-    countries?.getTopCountry?.()
-  );
-  let centerCountry: string | undefined;
-
-  const mapCenter =
-    sdk?.Map?.getMapCenter?.() ??
-    sdk?.Map?.getCenter?.();
-
-  let lon: number | undefined;
-  let lat: number | undefined;
-
-  if (Array.isArray(mapCenter) && mapCenter.length >= 2) {
-    const [centerLon, centerLat] = mapCenter;
-    if (typeof centerLon === "number" && typeof centerLat === "number") {
-      lon = centerLon;
-      lat = centerLat;
-    }
-  } else if (mapCenter && typeof mapCenter === "object") {
-    const center = mapCenter as Record<string, unknown>;
-    const rawLon = center.lon ?? center.lng ?? center.x;
-    const rawLat = center.lat ?? center.y;
-
-    if (typeof rawLon === "number" && typeof rawLat === "number") {
-      lon = rawLon;
-      lat = rawLat;
-    }
-  }
-
-  if (countries && typeof lon === "number" && typeof lat === "number") {
-    const lookups = [
-      () => countries.getByPoint?.({ lon, lat }),
-      () => countries.getByPoint?.([lon, lat]),
-      () => countries.getByPoint?.(lon, lat),
-      () => countries.getByCoordinates?.({ lon, lat }),
-      () => countries.getByCoordinates?.([lon, lat]),
-      () => countries.getByCoordinates?.(lon, lat),
-      () => countries.getByLocation?.({ lon, lat }),
-      () => countries.getByLocation?.({ lat, lon }),
-      () => countries.getByLocation?.(lon, lat),
-      () => countries.getByLonLat?.({ lon, lat }),
-      () => countries.getByLonLat?.(lon, lat),
-      () => countries.getByLatLon?.({ lat, lon }),
-      () => countries.getByLatLon?.(lat, lon)
-    ];
-
-    for (const lookup of lookups) {
-      try {
-        const result = lookup();
-
-        const entries = Array.isArray(result) ? result : [result];
-        for (const entry of entries) {
-          const country = resolveCountryCodeFromCountryEntity(entry);
-          if (country) {
-            centerCountry = country;
-            break;
-          }
-        }
-
-        if (centerCountry) {
-          break;
-        }
-      } catch {
-        // Ignore lookup shape mismatch and continue with next method.
-      }
-    }
-  }
-
-  const venues = getVisibleVenues();
-  let venueCountry: string | undefined;
-  for (const venue of venues) {
-    const country = resolveVenueCountryCode(venue);
-    if (country) {
-      venueCountry = country;
-      break;
-    }
-  }
-
-  const segments = sdk?.DataModel?.Segments?.getAll?.();
-  let segmentCountry: string | undefined;
-
-  if (Array.isArray(segments)) {
-    for (const segment of segments) {
-      const countryIdCandidates = [
-        segment?.countryID,
-        segment?.countryId,
-        segment?.attributes?.countryID,
-        segment?.attributes?.countryId,
-        segment?.address?.countryID,
-        segment?.address?.countryId
-      ];
-
-      for (const countryId of countryIdCandidates) {
-        const resolved = resolveCountryCodeFromCountryId(countryId);
-        if (resolved) {
-          segmentCountry = resolved;
-          break;
-        }
-      }
-
-      if (segmentCountry) {
-        break;
-      }
-
-      const countryObjectCandidates = [
-        segment?.country,
-        segment?.address?.country
-      ];
-
-      for (const countryObject of countryObjectCandidates) {
-        const resolved = resolveCountryCodeFromCountryEntity(countryObject);
-        if (resolved) {
-          segmentCountry = resolved;
-          break;
-        }
-      }
-
-      if (segmentCountry) {
-        break;
-      }
-    }
-  }
-
-  const hostWindow = (() => {
-    try {
-      if (typeof unsafeWindow !== "undefined") {
-        return unsafeWindow as any;
-      }
-    } catch {
-      // ignore
-    }
-
-    return window as any;
-  })();
-
-  let legacyCountry: string | undefined;
-  const legacySegments = hostWindow?.W?.model?.segments?.objects;
-  const legacyCountriesModel = hostWindow?.W?.model?.countries;
-
-  if (legacySegments && typeof legacySegments === "object") {
-    for (const segment of Object.values(legacySegments) as any[]) {
-      const countryId =
-        segment?.attributes?.countryID ??
-        segment?.attributes?.countryId ??
-        segment?.countryID ??
-        segment?.countryId;
-
-      if (countryId === undefined || countryId === null) {
-        continue;
-      }
-
-      const countryObject =
-        legacyCountriesModel?.getObjectById?.(countryId) ??
-        legacyCountriesModel?.objects?.[countryId];
-
-      const resolved =
-        resolveCountryCodeFromCountryEntity(countryObject?.attributes ?? countryObject) ??
-        resolveCountryCodeFromCountryId(countryId);
-
-      if (resolved) {
-        legacyCountry = resolved;
-        break;
-      }
-    }
-  }
-
-  logger.info(
-    `Map country candidates: top=${topCountry ?? "none"}, center=${centerCountry ?? "none"}, venues=${venueCountry ?? "none"}, segments=${segmentCountry ?? "none"}, legacy=${legacyCountry ?? "none"}`
+    sdk?.DataModel?.Countries?.getTopCountry?.()
   );
 
-  return topCountry ?? centerCountry ?? venueCountry ?? segmentCountry ?? legacyCountry;
+  logger.info(`Map country candidate: top=${topCountry ?? "none"}`);
+
+  return topCountry;
 }
 
 function wait(ms: number): Promise<void> {
@@ -712,27 +544,16 @@ async function refreshExternalProviderValidation(params: {
 
 async function resolveStartupCountry(
   fallbackCountry?: string,
-  attempts = 8,
-  delayMs = 400
 ): Promise<string | undefined> {
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const mapCountry = getCountryFromVisibleMapContext();
-    const selectionCountry = getCountryFromCurrentSelection();
-    const resolved = mapCountry ?? selectionCountry;
+  const mapCountry = getCountryFromVisibleMapContext();
+  const selectionCountry = getCountryFromCurrentSelection();
+  const resolved = mapCountry ?? selectionCountry ?? fallbackCountry;
 
-    if (resolved) {
-      logger.info(
-        `Startup country resolved on attempt ${attempt}: ${normalizeCountryCode(resolved)}`
-      );
-      return resolved;
-    }
+  logger.info(
+    `Startup country resolved: selection=${selectionCountry ?? "none"}, map=${mapCountry ?? "none"}, fallback=${normalizeCountryCode(fallbackCountry) ?? "none"}, chosen=${normalizeCountryCode(resolved) ?? "global"}`
+  );
 
-    if (attempt < attempts) {
-      await wait(delayMs);
-    }
-  }
-
-  return fallbackCountry;
+  return resolved;
 }
 
 async function loadRuntimeDataForCountry(country?: string): Promise<void> {
@@ -1108,8 +929,8 @@ async function reloadData(): Promise<void> {
   const selectionCountry = getCountryFromCurrentSelection();
   const mapContextCountry = getCountryFromVisibleMapContext();
   const preferredCountry =
-    mapContextCountry ??
     selectionCountry ??
+    mapContextCountry ??
     runtimeCountry ??
     runtimeSettings.fallbackCountry;
   logger.info(
@@ -1570,11 +1391,6 @@ async function analyzeVenue(params: {
     statusMessage: previous?.statusMessage
   });
 
-  retryEnsureFeatureEditorContainer(() => {
-    const latest = getLatestAnalysisState();
-    return !!latest?.isVenueSelection;
-  });
-
   renderLatestVenueAnalysis();
 
   externalProviderSuggestionRequestId += 1;
@@ -1637,20 +1453,13 @@ export async function startApplication(): Promise<void> {
     logger.warn(`Initial map data not ready yet: ${message}`);
   }
 
-  mountSidebarPlaceholder();
-
   const manifest = await loadManifest(settings.dataChannel);
   runtimeManifest = manifest;
   logger.info(
     `Active manifest loaded: ${manifest.channel} / ${manifest.version} / ${manifest.dataRevision}`
   );
 
-  const selectionCountry = getCountryFromCurrentSelection();
-  const mapContextCountry = getCountryFromVisibleMapContext();
   const initialCountry = await resolveStartupCountry(settings.fallbackCountry);
-  logger.info(
-    `Startup country context: selection=${selectionCountry ?? "none"}, map=${mapContextCountry ?? "none"}, fallback=${normalizeCountryCode(settings.fallbackCountry) ?? "none"}, chosen=${normalizeCountryCode(initialCountry) ?? "global"}`
-  );
   await loadRuntimeDataForCountry(initialCountry);
 
   if (!runtimeConfig || !runtimeChains) {
@@ -1696,7 +1505,20 @@ export async function startApplication(): Promise<void> {
     () => !!runtimeSettings?.autoScanVisibleVenues,
     () => scanVisibleVenuesFromMap("auto")
   );
-  registerVenueSaveScanListener(() => scanVisibleVenuesFromMap("manual"));
+  registerVenueSaveScanListener(async (savedVenueIds) => {
+    const visibleVenueIds = new Set(
+      getVisibleVenues().map((venue) => String(venue.id))
+    );
+
+    if (!savedVenueIds.some((venueId) => visibleVenueIds.has(venueId))) {
+      logger.info(
+        `Skipping visible venue rescan; saved venues are outside the viewport (${savedVenueIds.join(", ")})`
+      );
+      return;
+    }
+
+    await scanVisibleVenuesFromMap("manual");
+  });
 
   logger.info("Registering selected venue analysis flow");
 
@@ -1708,11 +1530,6 @@ export async function startApplication(): Promise<void> {
       removeFeatureEditorContainer();
       return;
     }
-
-    retryEnsureFeatureEditorContainer(() => {
-      const current = getLatestAnalysisState();
-      return !!current?.isVenueSelection;
-    });
 
     renderLatestVenueAnalysis();
   });
@@ -1727,6 +1544,7 @@ export async function startApplication(): Promise<void> {
       logger.info("Selection is not a venue, hiding Place Harmonizer block");
       externalProviderSuggestionRequestId += 1;
       clearLatestAnalysisState();
+      removeFeatureEditorContainer();
       const sidebarState = getSidebarDebugState();
       if (sidebarState) {
         setSidebarDebugState({

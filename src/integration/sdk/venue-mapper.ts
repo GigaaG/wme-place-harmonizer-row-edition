@@ -1,8 +1,8 @@
-import type { PlaceLike, GeometryType, OpeningHourDefinition } from "../../types/place";
-import type { PlaceAddress } from "../../types/address";
-import { normalizeCategoryKeys } from "../../config/category-key";
-import { resolveVenueCountryCode } from "./venue-country";
-import { getWmeSdk } from "./wme";
+import type { PlaceLike, GeometryType, OpeningHourDefinition } from "../../types/place.ts";
+import type { PlaceAddress } from "../../types/address.ts";
+import { normalizeCategoryKeys } from "../../config/category-key.ts";
+import { resolveCountryCodeFromCountryEntity } from "./venue-country.ts";
+import { getWmeSdk } from "./wme.ts";
 
 function mapGeometry(geometry: any): GeometryType | undefined {
   if (geometry?.type === "Point" || geometry?.type === "point") {
@@ -107,8 +107,7 @@ function getVenueAddressFromSdk(venue: any): any | undefined {
   }
 }
 
-function mapAddress(venue: any): PlaceAddress | undefined {
-  const sdkAddress = getVenueAddressFromSdk(venue);
+function mapAddressFromSdkAddress(sdkAddress: any): PlaceAddress | undefined {
   if (!sdkAddress || sdkAddress.isEmpty) {
     return undefined;
   }
@@ -127,7 +126,17 @@ function mapAddress(venue: any): PlaceAddress | undefined {
     : undefined;
 }
 
+function mapCountryFromSdkAddress(sdkAddress: any): string | undefined {
+  if (!sdkAddress || sdkAddress.isEmpty) {
+    return undefined;
+  }
+
+  return resolveCountryCodeFromCountryEntity(sdkAddress.country);
+}
+
 export function mapVenueToPlaceLike(venue: any): PlaceLike {
+  const sdkAddress = getVenueAddressFromSdk(venue);
+
   return {
     name: venue.name ?? "",
     categories: mapCategories(venue),
@@ -145,8 +154,8 @@ export function mapVenueToPlaceLike(venue: any): PlaceLike {
     openingHours: mapOpeningHours(venue.openingHours),
     navigationPointCount: mapNavigationPointCount(venue),
     externalProviderIds: venue.externalProviderIds ?? [],
-    address: mapAddress(venue),
+    address: mapAddressFromSdkAddress(sdkAddress),
 
-    country: resolveVenueCountryCode(venue)
+    country: mapCountryFromSdkAddress(sdkAddress)
   };
 }

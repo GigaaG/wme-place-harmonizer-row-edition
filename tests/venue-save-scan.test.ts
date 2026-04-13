@@ -5,6 +5,12 @@ import {
   registerVenueSaveScanListener,
   resetVenueSaveScanListenerForTests
 } from "../src/integration/sdk/venue-save-scan.ts";
+import {
+  resolveCountryCodeFromCountryId
+} from "../src/integration/sdk/venue-country.ts";
+import {
+  mapVenueToPlaceLike
+} from "../src/integration/sdk/venue-mapper.ts";
 
 function runTest(name: string, fn: () => void | Promise<void>): Promise<void> {
   return Promise.resolve()
@@ -59,6 +65,7 @@ await runTest("rescans after venue save events", async () => {
     | undefined;
   let trackedDataModelName: string | undefined;
   let scanCount = 0;
+  let lastSavedVenueIds: string[] | undefined;
 
   const sdk = {
     Events: {
@@ -89,8 +96,9 @@ await runTest("rescans after venue save events", async () => {
   resetVenueSaveScanListenerForTests();
 
   try {
-    registerVenueSaveScanListener(async () => {
+    registerVenueSaveScanListener(async (savedVenueIds) => {
       scanCount += 1;
+      lastSavedVenueIds = savedVenueIds;
     });
 
     assert.equal(trackedDataModelName, "venues");
@@ -111,6 +119,7 @@ await runTest("rescans after venue save events", async () => {
 
     await new Promise((resolve) => setTimeout(resolve, 350));
     assert.equal(scanCount, 1);
+    assert.deepEqual(lastSavedVenueIds, ["venue-1"]);
   } finally {
     resetVenueSaveScanListenerForTests();
     if (previousGetWmeSdk === undefined) {
@@ -129,6 +138,109 @@ await runTest("rescans after venue save events", async () => {
       delete targetWindow.setTimeout;
     } else {
       targetWindow.setTimeout = previousSetTimeout;
+    }
+
+    hostWindow.unsafeWindow = previousUnsafeWindow;
+  }
+});
+
+await runTest("resolves country codes through the documented countryId lookup", () => {
+  const hostWindow = globalThis as typeof globalThis & {
+    window?: any;
+    unsafeWindow?: any;
+  };
+  const previousUnsafeWindow = hostWindow.unsafeWindow;
+  const targetWindow = hostWindow.window ?? (hostWindow.window = {});
+  const previousGetWmeSdk = targetWindow.getWmeSdk;
+
+  targetWindow.getWmeSdk = () => ({
+    DataModel: {
+      Countries: {
+        getById: ({ countryId }: { countryId: number }) => {
+          assert.equal(countryId, 84);
+          return {
+            name: "the Netherlands"
+          };
+        },
+        getAll() {
+          throw new Error("unexpected fallback lookup");
+        }
+      }
+    }
+  });
+  hostWindow.unsafeWindow = undefined;
+
+  try {
+    assert.equal(resolveCountryCodeFromCountryId("84"), "nl");
+  } finally {
+    if (previousGetWmeSdk === undefined) {
+      delete targetWindow.getWmeSdk;
+    } else {
+      targetWindow.getWmeSdk = previousGetWmeSdk;
+    }
+
+    hostWindow.unsafeWindow = previousUnsafeWindow;
+  }
+});
+
+await runTest("maps venue address and country from one SDK address read", () => {
+  const hostWindow = globalThis as typeof globalThis & {
+    window?: any;
+    unsafeWindow?: any;
+  };
+  const previousUnsafeWindow = hostWindow.unsafeWindow;
+  const targetWindow = hostWindow.window ?? (hostWindow.window = {});
+  const previousGetWmeSdk = targetWindow.getWmeSdk;
+  let addressReads = 0;
+
+  targetWindow.getWmeSdk = () => ({
+    DataModel: {
+      Venues: {
+        getAddress: ({ venueId }: { venueId: string }) => {
+          addressReads += 1;
+          assert.equal(venueId, "venue-1");
+
+          return {
+            isEmpty: false,
+            city: {
+              name: "Alkmaar"
+            },
+            street: {
+              name: "Kanaalkade",
+              englishName: "Kanaalkade"
+            },
+            houseNumber: "12",
+            country: {
+              name: "the Netherlands"
+            }
+          };
+        }
+      }
+    }
+  });
+  hostWindow.unsafeWindow = undefined;
+
+  try {
+    const place = mapVenueToPlaceLike({
+      id: "venue-1",
+      name: "Test Venue",
+      categories: [],
+      openingHours: [],
+      externalProviderIds: []
+    });
+
+    assert.equal(addressReads, 1);
+    assert.deepEqual(place.address, {
+      city: "Alkmaar",
+      street: "Kanaalkade",
+      houseNumber: "12"
+    });
+    assert.equal(place.country, "nl");
+  } finally {
+    if (previousGetWmeSdk === undefined) {
+      delete targetWindow.getWmeSdk;
+    } else {
+      targetWindow.getWmeSdk = previousGetWmeSdk;
     }
 
     hostWindow.unsafeWindow = previousUnsafeWindow;

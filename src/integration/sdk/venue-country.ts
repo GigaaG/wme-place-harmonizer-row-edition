@@ -1,5 +1,5 @@
-import { getCountryCodeCandidates, normalizeCountryCode } from "../../config/country-code";
-import { getWmeSdk } from "./wme";
+import { getCountryCodeCandidates, normalizeCountryCode } from "../../config/country-code.ts";
+import { getWmeSdk } from "./wme.ts";
 
 const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   netherlands: "nl",
@@ -122,44 +122,11 @@ function findCountryById(countryId: unknown): any {
     return undefined;
   }
 
-  const lookups = [
-    () => countries.getById?.({ countryId: normalizedId }),
-    () => countries.getById?.({ id: normalizedId }),
-    () => countries.getById?.(normalizedId)
-  ];
-
-  for (const lookup of lookups) {
-    try {
-      const result = lookup();
-      if (result) {
-        return result;
-      }
-    } catch {
-      // Ignore shape mismatch and continue with next lookup variant.
-    }
-  }
-
-  const allCountries = countries.getAll?.();
-  if (!Array.isArray(allCountries)) {
+  try {
+    return countries.getById?.({ countryId: normalizedId });
+  } catch {
     return undefined;
   }
-
-  return allCountries.find((country: any) => {
-    const id =
-      country?.id ??
-      country?.countryId ??
-      country?.attributes?.id ??
-      country?.attributes?.countryId;
-    if (typeof id === "number" && typeof normalizedId === "number") {
-      return id === normalizedId;
-    }
-
-    if (typeof id === "string") {
-      return id.trim() === String(normalizedId);
-    }
-
-    return false;
-  });
 }
 
 export function resolveCountryCodeFromCountryId(countryId: unknown): string | undefined {

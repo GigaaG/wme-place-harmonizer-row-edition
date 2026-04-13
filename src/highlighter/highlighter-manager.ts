@@ -1,12 +1,13 @@
-import { logger } from "../logging/logger";
-import { getWmeSdk } from "../integration/sdk/wme";
-import type { VisibleVenueScanSummary, ScannedVenueResult } from "../types/scan";
+import { logger } from "../logging/logger.ts";
+import { getWmeSdk } from "../integration/sdk/wme.ts";
+import type { VisibleVenueScanSummary, ScannedVenueResult } from "../types/scan.ts";
 import { t } from "../i18n/runtime.ts";
 import { shouldSkipVenueHighlight } from "./highlight-category-filter.ts";
 
 const HIGHLIGHT_LAYER_NAME = "wmeph-row-visible-venues";
 const MIN_POINT_HIGHLIGHT_ZOOM = 17;
-const POINT_HIGHLIGHT_RADIUS = 12;
+const ZOOM_17_POINT_HIGHLIGHT_RADIUS = 10;
+const HIGH_ZOOM_POINT_HIGHLIGHT_RADIUS = 14;
 const POINT_HIGHLIGHT_STROKE = 5;
 const POLYGON_HIGHLIGHT_STROKE = 4;
 const POLYGON_OUTLINE_STROKE = 6;
@@ -62,14 +63,17 @@ function getPolygonFillOpacity(severity: "ok" | "warning" | "error"): number {
   return 0.28;
 }
 
-function getPointHighlightStyle(severity: "ok" | "warning" | "error") {
+function getPointHighlightStyle(
+  severity: "ok" | "warning" | "error",
+  pointRadius: number
+) {
   return {
     strokeColor: getSeverityColor(severity),
     fillColor: "#ffffff",
     strokeOpacity: 1,
     fillOpacity: 0,
     strokeWidth: POINT_HIGHLIGHT_STROKE,
-    pointRadius: POINT_HIGHLIGHT_RADIUS
+    pointRadius
   };
 }
 
@@ -171,9 +175,7 @@ function buildSdkFeatures(
       return [];
     }
 
-    return [
-      createPointFeature(result, geometry.coordinates, "point-marker")
-    ];
+    return [createPointFeature(result, geometry.coordinates, "point-marker")];
   }
 
   if (
@@ -228,64 +230,15 @@ function buildSdkFeatures(
   return [];
 }
 
-function toNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-
-  return null;
-}
-
 function resolveCurrentZoomLevel(sdk: any): number | null {
-  const map = sdk?.Map;
+  try {
+    const zoomLevel = sdk?.Map?.getZoomLevel?.();
 
-  if (!map) {
-    return null;
-  }
-
-  const zoomCandidates: unknown[] = [];
-  const lookups = [
-    () => map.getZoomLevel?.(),
-    () => map.getZoom?.(),
-    () => map.getMapZoom?.(),
-    () => map.zoomLevel,
-    () => map.zoom,
-    () => map.currentZoom
-  ];
-
-  for (const lookup of lookups) {
-    try {
-      zoomCandidates.push(lookup());
-    } catch {
-      // ignore lookup signature mismatch
+    if (typeof zoomLevel === "number" && Number.isFinite(zoomLevel)) {
+      return zoomLevel;
     }
-  }
-
-  for (const candidate of zoomCandidates) {
-    const directNumber = toNumber(candidate);
-
-    if (directNumber !== null) {
-      return directNumber;
-    }
-
-    if (candidate && typeof candidate === "object") {
-      const typedCandidate = candidate as Record<string, unknown>;
-      const nestedNumber = toNumber(
-        typedCandidate.zoom ?? typedCandidate.level ?? typedCandidate.value
-      );
-
-      if (nestedNumber !== null) {
-        return nestedNumber;
-      }
-    }
+  } catch {
+    // ignore SDK errors
   }
 
   return null;
@@ -297,10 +250,19 @@ function buildStyleRules() {
 
   for (const severity of severities) {
     rules.push({
-      predicate: (featureProperties: any) =>
+      predicate: (featureProperties: any, zoomLevel: number) =>
         featureProperties?.severity === severity &&
-        featureProperties?.geometryKind === "point",
-      style: getPointHighlightStyle(severity)
+        featureProperties?.geometryKind === "point" &&
+        zoomLevel === MIN_POINT_HIGHLIGHT_ZOOM,
+      style: getPointHighlightStyle(severity, ZOOM_17_POINT_HIGHLIGHT_RADIUS)
+    });
+
+    rules.push({
+      predicate: (featureProperties: any, zoomLevel: number) =>
+        featureProperties?.severity === severity &&
+        featureProperties?.geometryKind === "point" &&
+        zoomLevel > MIN_POINT_HIGHLIGHT_ZOOM,
+      style: getPointHighlightStyle(severity, HIGH_ZOOM_POINT_HIGHLIGHT_RADIUS)
     });
 
     rules.push({
@@ -378,6 +340,12 @@ export function clearHighlights(): void {
 
   highlightedFeatureIds = [];
   logger.info("Highlight layer cleared");
+}
+
+export function resetHighlighterStateForTests(): void {
+  layerInitialized = false;
+  checkboxInitialized = false;
+  highlightedFeatureIds = [];
 }
 
 export function renderHighlights(

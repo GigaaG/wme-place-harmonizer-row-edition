@@ -37,7 +37,7 @@ function debounce(fn: () => void, delayMs: number): void {
 }
 
 export function registerVenueSaveScanListener(
-  scanHandler: () => Promise<void>
+  scanHandler: (savedVenueIds: string[]) => Promise<void> | void
 ): void {
   if (listenersRegistered) {
     return;
@@ -69,11 +69,11 @@ export function registerVenueSaveScanListener(
       }
 
       logger.info(
-        `Detected saved venue edit(s): ${savedVenueIds.join(", ")}; rescanning visible venues`
+        `Detected saved venue edit(s): ${savedVenueIds.join(", ")}`
       );
 
       debounce(() => {
-        void scanHandler();
+        void scanHandler(savedVenueIds);
       }, SAVE_SCAN_DEBOUNCE_MS);
     }
   });

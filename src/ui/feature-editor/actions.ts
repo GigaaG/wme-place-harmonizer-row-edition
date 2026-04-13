@@ -1,16 +1,18 @@
 import type { PlaceProposal } from "../../types/proposal";
+import { getFeatureEditorContainer } from "./container.ts";
 
 export function getSelectedProposals(
   proposals: PlaceProposal[]
 ): PlaceProposal[] {
+  const queryRoot: ParentNode = getFeatureEditorContainer() ?? document;
   const selectedInputs = [
     ...Array.from(
-      document.querySelectorAll<HTMLInputElement>(
+      queryRoot.querySelectorAll<HTMLInputElement>(
         ".wmeph-row-apply-checkbox:checked"
       )
     ),
     ...Array.from(
-      document.querySelectorAll<HTMLInputElement>(
+      queryRoot.querySelectorAll<HTMLInputElement>(
         ".wmeph-row-apply-radio:checked"
       )
     )

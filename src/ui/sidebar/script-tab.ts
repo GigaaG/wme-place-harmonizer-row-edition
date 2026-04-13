@@ -6,6 +6,10 @@ const SCRIPT_TAB_ID = "wmeph-row-script-tab";
 
 let registeredTabPane: HTMLElement | null = null;
 
+export function getScriptSidebarTabPane(): HTMLElement | null {
+  return registeredTabPane;
+}
+
 export async function ensureScriptSidebarTab(): Promise<HTMLElement | null> {
   if (registeredTabPane && document.contains(registeredTabPane)) {
     return registeredTabPane;
@@ -50,9 +54,7 @@ export function removeScriptSidebarTab(): void {
   }
 
   try {
-    sdk.Sidebar.removeScriptTab({
-      scriptId: SCRIPT_TAB_ID
-    });
+    sdk.Sidebar.removeScriptTab();
     registeredTabPane = null;
     logger.info("SDK script sidebar tab removed");
   } catch (error) {

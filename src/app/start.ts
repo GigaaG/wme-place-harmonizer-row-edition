@@ -17,7 +17,6 @@ import { resolveEffectivePolicy } from "../config/effective-policy";
 import { onVenueSelected } from "../integration/sdk/venue-selection";
 import { mapVenueToPlaceLike } from "../integration/sdk/venue-mapper";
 import { evaluatePlace } from "../rules/evaluate-place";
-import { validateUrlAvailability } from "../rules/url-availability.ts";
 import {
   waitForWmeSdkReady,
   waitForInitialMapDataLoaded,
@@ -107,7 +106,6 @@ let runtimeSettings: UserSettings | null = null;
 let runtimeCountry: string | undefined;
 let externalProviderSuggestionRequestId = 0;
 let externalProviderValidationRequestId = 0;
-let urlAvailabilityRequestId = 0;
 let pendingWhitelistRenderTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
 //
@@ -596,12 +594,6 @@ function removeExternalProviderValidationProposals(
   );
 }
 
-function removeUrlAvailabilityIssues(
-  issues: PlaceIssue[]
-): PlaceIssue[] {
-  return issues.filter((issue) => issue.ruleId !== "urlValidation.availability");
-}
-
 async function refreshExternalProviderSuggestions(params: {
   requestId: number;
   venue: any;
@@ -658,40 +650,6 @@ async function refreshExternalProviderSuggestions(params: {
       ? `Found ${suggestions.length} external provider suggestion(s) for venue ${params.venue.id}`
       : `No nearby external provider suggestions found for venue ${params.venue.id}`
   );
-
-  renderLatestVenueAnalysis();
-}
-
-async function refreshUrlAvailabilityValidation(params: {
-  requestId: number;
-  venueId: string;
-  url: string;
-}): Promise<void> {
-  const issue = await validateUrlAvailability(params.url);
-
-  if (params.requestId !== urlAvailabilityRequestId) {
-    return;
-  }
-
-  const latest = getLatestAnalysisState();
-
-  if (!latest?.isVenueSelection || latest.venueId !== params.venueId) {
-    return;
-  }
-
-  const filteredAnalysis = applyWhitelistToAnalysis({
-    venueId: latest.venueId,
-    issues: issue
-      ? [...removeUrlAvailabilityIssues(latest.issues), issue]
-      : removeUrlAvailabilityIssues(latest.issues),
-    proposals: latest.proposals
-  });
-
-  setLatestAnalysisState({
-    ...latest,
-    issues: filteredAnalysis.issues,
-    proposals: filteredAnalysis.proposals
-  });
 
   renderLatestVenueAnalysis();
 }
@@ -1618,19 +1576,6 @@ async function analyzeVenue(params: {
   });
 
   renderLatestVenueAnalysis();
-
-  urlAvailabilityRequestId += 1;
-  const hasUrlFormatIssue = issues.some(
-    (issue) => issue.ruleId === "urlValidation.format"
-  );
-
-  if ((place.url ?? "").trim().length > 0 && !hasUrlFormatIssue) {
-    void refreshUrlAvailabilityValidation({
-      requestId: urlAvailabilityRequestId,
-      venueId: String(venue.id),
-      url: place.url!.trim()
-    });
-  }
 
   externalProviderSuggestionRequestId += 1;
   const suggestionIssue = findMissingExternalProviderIssue(issues);

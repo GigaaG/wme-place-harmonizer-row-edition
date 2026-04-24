@@ -6,11 +6,11 @@ De wiki is voorbereid op meerdere talen. De Nederlandse documentatie is op dit m
 
 ```text
 docs/wiki/
-├── Home.md                         # Nederlandse startpagina / hoofdindex
-├── 01-...md                        # Nederlandse inhoudspagina's
-├── screenshots/                    # Gedeelde screenshots
+├── Home.md                         # Taalkeuze / hoofdindex
+├── screenshots/                    # Gedeelde, taalneutrale screenshots
 └── languages/
     ├── README.md                   # Uitleg over talen
+    ├── nl/                         # Nederlandse wiki-pagina's, huidige bronversie
     ├── en/                         # Engelse wiki-pagina's
     └── fr/                         # Franse wiki-pagina's
 ```
@@ -27,9 +27,17 @@ Voorlopig geldt:
 
 ## Screenshots
 
-Screenshots staan voorlopig centraal in `docs/wiki/screenshots/`.
+Screenshots staan centraal in `docs/wiki/screenshots/` en worden gedeeld door alle talen.
 
-Dat voorkomt dubbele afbeeldingen per taal. Als later blijkt dat screenshots per taal nodig zijn, bijvoorbeeld omdat de interface in verschillende talen zichtbaar is, kan per taal een eigen map worden toegevoegd:
+Gebruik daarom zoveel mogelijk taalneutrale bestandsnamen, bijvoorbeeld:
+
+```text
+sidebar-overview.png
+feature-editor-analysis.png
+google-maps-validation-detail.png
+```
+
+Dat voorkomt dubbele afbeeldingen per taal. Als later blijkt dat screenshots per taal nodig zijn, bijvoorbeeld omdat de interface in verschillende talen zichtbaar is, kan alsnog per taal een eigen map worden toegevoegd:
 
 ```text
 docs/wiki/languages/en/screenshots/
@@ -40,11 +48,12 @@ docs/wiki/languages/fr/screenshots/
 
 Aanbevolen werkwijze:
 
-1. Gebruik de Nederlandse pagina als bron.
-2. Vertaal de inhoud naar de nieuwe taal.
-3. Pas communityspecifieke details aan waar nodig.
-4. Controleer of screenshot-links nog kloppen.
-5. Laat minimaal een native of ervaren communitylid meelezen.
+1. Gebruik `docs/wiki/languages/nl/` als bron.
+2. Kopieer de pagina naar de nieuwe taalmap.
+3. Vertaal de inhoud naar de nieuwe taal.
+4. Pas communityspecifieke details aan waar nodig.
+5. Laat de gedeelde screenshot-links naar `../../screenshots/` staan, tenzij er taalspecifieke screenshots nodig zijn.
+6. Laat minimaal een native of ervaren communitylid meelezen.
 
 ## Let op bij communityspecifieke inhoud
 

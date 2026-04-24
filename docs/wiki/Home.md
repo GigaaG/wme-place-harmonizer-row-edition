@@ -1,12 +1,24 @@
-# WME Place Harmonizer ROW Edition - Nederlandse gebruikerswiki
+# WME Place Harmonizer ROW Edition - gebruikerswiki
 
-Welkom bij de Nederlandse gebruikerswiki voor **WME Place Harmonizer ROW Edition**.
+Welkom bij de gebruikerswiki voor **WME Place Harmonizer ROW Edition**.
 
-Deze wiki is bedoeld als eerste documentatie voor de **Country Managers van de Nederlandse Waze-editorscommunity**. Het doel is om op hoog niveau draagvlak, feedback en validatie te verzamelen voordat het script breder onder editors wordt gedeeld.
+Deze eerste versie van de documentatie is geschreven in het Nederlands en bedoeld voor de **Country Managers van de Nederlandse Waze-editorscommunity**. Het doel is om op hoog niveau draagvlak, feedback en validatie te verzamelen voordat het script breder onder editors wordt gedeeld.
 
 Het script helpt bij het controleren en harmoniseren van WME-places aan de hand van community-afspraken. Het geeft meldingen en voorstellen, maar laat de editor altijd zelf beslissen wat er met een place gebeurt.
 
 ![Overzicht van het script in WME](screenshots/00-overzicht-script-in-wme.png)
+
+## Beschikbare talen
+
+De wiki is voorbereid op meerdere talen, net als het script zelf.
+
+| Taal | Status | Startpagina |
+| --- | --- | --- |
+| Nederlands | Actieve eerste versie | Deze pagina |
+| English | Voorbereid, nog niet vertaald | [English landing page](languages/en/Home.md) |
+| Francais | Voorbereid, nog niet vertaald | [Page d'accueil francaise](languages/fr/Home.md) |
+
+Voorlopig is Nederlands leidend, omdat de eerste configuratie en validatieronde specifiek voor Nederland zijn bedoeld. Latere vertalingen kunnen dezelfde structuur volgen en waar nodig communityspecifieke informatie toevoegen.
 
 ## Voor wie is deze wiki bedoeld?
 
@@ -26,7 +38,7 @@ De Place Harmonizer **past niets automatisch definitief aan in WME**. Het script
 
 Dat maakt het script vooral een hulpmiddel voor kwaliteit, consistentie en discussie over standaarden; geen automatische correctiebot.
 
-## Wiki-pagina's
+## Nederlandse wiki-pagina's
 
 1. [Doel en uitgangspunten](01-doel-en-uitgangspunten.md)
 2. [Eerste gebruik](02-eerste-gebruik.md)
@@ -36,6 +48,7 @@ Dat maakt het script vooral een hulpmiddel voor kwaliteit, consistentie en discu
 6. [Whitelist en lokale uitzonderingen](06-whitelist-en-uitzonderingen.md)
 7. [Feedback, problemen en vervolgstappen](07-feedback-problemen-en-vervolgstappen.md)
 8. [Screenshots toevoegen](screenshots/README.md)
+9. [Meertalige wiki-structuur](languages/README.md)
 
 ## Gewenste feedback van Country Managers
 

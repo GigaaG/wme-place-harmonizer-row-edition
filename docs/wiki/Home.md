@@ -1,66 +1,20 @@
-# WME Place Harmonizer ROW Edition - gebruikerswiki
+# WME Place Harmonizer ROW Edition - User Wiki
 
 Welkom bij de gebruikerswiki voor **WME Place Harmonizer ROW Edition**.
 
-Deze eerste versie van de documentatie is geschreven in het Nederlands en bedoeld voor de **Country Managers van de Nederlandse Waze-editorscommunity**. Het doel is om op hoog niveau draagvlak, feedback en validatie te verzamelen voordat het script breder onder editors wordt gedeeld.
-
-Het script helpt bij het controleren en harmoniseren van WME-places aan de hand van community-afspraken. Het geeft meldingen en voorstellen, maar laat de editor altijd zelf beslissen wat er met een place gebeurt.
-
-![Overzicht van het script in WME](screenshots/00-overzicht-script-in-wme.png)
-
-## Beschikbare talen
-
-De wiki is voorbereid op meerdere talen, net als het script zelf.
+Deze wiki is voorbereid op meerdere talen. Kies hieronder de gewenste taal.
 
 | Taal | Status | Startpagina |
 | --- | --- | --- |
-| Nederlands | Actieve eerste versie | Deze pagina |
-| English | Voorbereid, nog niet vertaald | [English landing page](languages/en/Home.md) |
-| Francais | Voorbereid, nog niet vertaald | [Page d'accueil francaise](languages/fr/Home.md) |
+| Nederlands | Actieve eerste versie | [Nederlandse wiki](languages/nl/Home.md) |
+| English | Voorbereid, nog niet vertaald | [English wiki](languages/en/Home.md) |
+| Francais | Voorbereid, nog niet vertaald | [Wiki francais](languages/fr/Home.md) |
 
-Voorlopig is Nederlands leidend, omdat de eerste configuratie en validatieronde specifiek voor Nederland zijn bedoeld. Latere vertalingen kunnen dezelfde structuur volgen en waar nodig communityspecifieke informatie toevoegen.
+## Structuur
 
-## Voor wie is deze wiki bedoeld?
+- [Meertalige wiki-structuur](languages/README.md)
+- [Gedeelde screenshots](screenshots/README.md)
 
-Deze eerste opzet is geschreven voor Nederlandse Country Managers. De groep bestaat uit zowel technische als minder technische editors. Daarom ligt de nadruk op:
+## Opmerking
 
-- wat het script doet;
-- welke controles het uitvoert;
-- hoe je de meldingen moet interpreteren;
-- waar de Nederlandse configuratie invloed op heeft;
-- waar feedback of discussie nodig is voordat het script breder wordt uitgerold.
-
-De wiki is niet bedoeld als technische ontwikkelaarsdocumentatie. Technische details worden alleen genoemd waar ze helpen om keuzes of gedrag van het script te begrijpen.
-
-## Belangrijk uitgangspunt
-
-De Place Harmonizer **past niets automatisch definitief aan in WME**. Het script kan suggesties invullen in het WME-formulier, maar de editor moet wijzigingen altijd zelf controleren en opslaan in WME.
-
-Dat maakt het script vooral een hulpmiddel voor kwaliteit, consistentie en discussie over standaarden; geen automatische correctiebot.
-
-## Nederlandse wiki-pagina's
-
-1. [Doel en uitgangspunten](01-doel-en-uitgangspunten.md)
-2. [Eerste gebruik](02-eerste-gebruik.md)
-3. [Script Sidebar](03-script-sidebar.md)
-4. [Place-analyse en suggesties](04-place-analyse-en-suggesties.md)
-5. [Validaties voor de Nederlandse configuratie](05-validaties-nederlandse-configuratie.md)
-6. [Whitelist en lokale uitzonderingen](06-whitelist-en-uitzonderingen.md)
-7. [Feedback, problemen en vervolgstappen](07-feedback-problemen-en-vervolgstappen.md)
-8. [Screenshots toevoegen](screenshots/README.md)
-9. [Meertalige wiki-structuur](languages/README.md)
-
-## Gewenste feedback van Country Managers
-
-Bij het beoordelen van het script is vooral feedback gewenst op de volgende punten:
-
-- Kloppen de Nederlandse richtlijnen zoals ze nu in de configuratie zijn verwerkt?
-- Zijn meldingen duidelijk genoeg voor minder technische editors?
-- Zijn de voorgestelde correcties veilig genoeg om breder uit te rollen?
-- Welke categorieen of ketens moeten als eerste extra aandacht krijgen?
-- Welke controles zijn nuttig, en welke kunnen mogelijk ruis veroorzaken?
-- Is Google Maps-validatie wenselijk in de huidige vorm?
-
-## Status
-
-Deze documentatie beschrijft de huidige eerste Nederlandse opzet. De Nederlandse configuratie is op dit moment leidend. Door de flexibele opzet van het script kan later ook worden gekeken naar gebruik in andere communities, maar deze wiki richt zich bewust eerst op Nederland.
+De Nederlandse versie is momenteel leidend, omdat de eerste configuratie en validatieronde specifiek gericht zijn op de Nederlandse Waze-editorscommunity. Latere vertalingen kunnen dezelfde structuur volgen en waar nodig communityspecifieke informatie toevoegen.
